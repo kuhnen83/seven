@@ -509,6 +509,44 @@
   <button class="btn btn-salvar" style="width:100%;margin-bottom:20px;" onclick="fecharResumo()">&#8592; Voltar para Recibos</button>
 </div>
 
+<!-- Scripts unificados e organizados -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+  import {
+    getFirestore, collection, addDoc, updateDoc, deleteDoc, getDocs, doc, getDoc, query, orderBy, onSnapshot
+  } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAN8PKdOni3mJC-DvAFfjHI1ohBpi7eb28",
+    authDomain: "agendaseven-428ad.firebaseapp.com",
+    projectId: "agendaseven-428ad",
+    storageBucket: "agendaseven-428ad.firebasestorage.app",
+    messagingSenderId: "908846325130",
+    appId: "1:908846325130:web:e5badefe60a02740bc3c73"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // Expondo as funções necessárias do Firebase para o escopo global (window)
+  window.carregarAgendamentosRealtime = function() {
+    const q = query(collection(db, "agendamentos"), orderBy("service_date"));
+    onSnapshot(q, (snapshot) => {
+      let agendamentosFirebase = [];
+      snapshot.forEach((doc) => {
+        agendamentosFirebase.push({ id: doc.id, ...doc.data() });
+      });
+      
+      if(agendamentosFirebase.length > 0) {
+        agendamentos = agendamentosFirebase;
+        localStorage.setItem('seven_agendamentos', JSON.stringify(agendamentos));
+      }
+      gerarProximoNumeroRecibo();
+      renderCalendario();
+    });
+  }
+</script>
+
 <script>
   // ===== ESTADO =====
   let agendamentos = JSON.parse(localStorage.getItem('seven_agendamentos')) || [];
@@ -521,16 +559,23 @@
   const SEMANA = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 
   // ===== INICIALIZAÇÃO =====
-  document.getElementById('data').valueAsDate = new Date();
-  gerarProximoNumeroRecibo();
-  renderCalendario();
+  window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById("data").valueAsDate = new Date();
+    
+    // Tenta carregar do Firebase se a função estiver disponível, senão inicia com o LocalStorage
+    if (typeof window.carregarAgendamentosRealtime === 'function') {
+      window.carregarAgendamentosRealtime();
+    } else {
+      gerarProximoNumeroRecibo();
+      renderCalendario();
+    }
+  });
 
   // ===== GERADOR DE NÚMERO DE RECIBO AUTOMÁTICO =====
   function gerarProximoNumeroRecibo() {
-    let proximoNumero = 10; // Valor inicial padrão: 0010
+    let proximoNumero = 10; 
     
     if (agendamentos.length > 0) {
-      // Mapeia os números existentes, convertendo para inteiro
       const numeros = agendamentos
         .map(a => parseInt(a.receipt_number, 10))
         .filter(n => !isNaN(n));
@@ -542,7 +587,6 @@
         }
       }
     }
-    // Formata o número com preenchimento de zeros à esquerda (ex: 0010, 0011, 0105...)
     document.getElementById('numRecibo').value = String(proximoNumero).padStart(4, '0');
   }
 
@@ -560,7 +604,7 @@
     return v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
   }
 
-  // ===== SALVAR =====
+  // ===== CAPTURAR DADOS DO FORMULÁRIO =====
   function capturar(id) {
     const nome  = document.getElementById('nomeCliente').value.trim();
     const data  = document.getElementById('data').value;
@@ -582,6 +626,7 @@
     };
   }
 
+  // ===== AÇÕES DOS BOTÕES =====
   function salvarNaAgenda() {
     const nome = document.getElementById('nomeCliente').value.trim();
     const data = document.getElementById('data').value;
@@ -656,7 +701,7 @@
     document.getElementById('statusPagamento').value = 'Pago';
     document.getElementById('data').valueAsDate      = new Date();
     calcularTotal();
-    gerarProximoNumeroRecibo(); // Gera o número sequencial atualizado automaticamente
+    gerarProximoNumeroRecibo(); 
     document.getElementById('btnSalvar').style.display    = 'flex';
     document.getElementById('btnAtualizar').style.display = 'none';
     document.getElementById('btnExcluir').style.display   = 'none';
@@ -687,8 +732,10 @@
 
     const eventosPorData = {};
     agendamentos.forEach(a => {
-      if (!eventosPorData[a.service_date]) eventosPorData[a.service_date] = [];
-      eventosPorData[a.service_date].push(a);
+      if (a.service_date) {
+        if (!eventosPorData[a.service_date]) eventosPorData[a.service_date] = [];
+        eventosPorData[a.service_date].push(a);
+      }
     });
 
     const grid = document.getElementById('calGrid');
