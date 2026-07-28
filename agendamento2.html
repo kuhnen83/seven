@@ -449,8 +449,8 @@
     <button id="btnAtualizar" class="btn btn-atualizar" onclick="atualizarAgenda()">✏️ Salvar Alterações</button>
     <button id="btnExcluir"   class="btn btn-excluir"   onclick="excluirAgendamento()">🗑️ Excluir</button>
     <button id="btnNovo"      class="btn btn-novo"      onclick="limparFormulario()">➕ Novo</button>
-    <button                   class="btn btn-imprimir"  onclick="window.print()">🖨️ Imprimir / PDF</button>
-    <button                   class="btn btn-resumo"    onclick="abrirResumo()">📊 Ver Resumo</button>
+    <button                   class="btn btn-imprimir" onclick="window.print()">🖨️ Imprimir / PDF</button>
+    <button                   class="btn btn-resumo"   onclick="abrirResumo()">📊 Ver Resumo</button>
   </div>
 </div>
 
@@ -509,13 +509,14 @@
   <button class="btn btn-salvar" style="width:100%;margin-bottom:20px;" onclick="fecharResumo()">&#8592; Voltar para Recibos</button>
 </div>
 
-<!-- Scripts unificados e organizados -->
+<!-- Scripts Firebase integrados com Firestore real-time -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
   import {
-    getFirestore, collection, addDoc, updateDoc, deleteDoc, getDocs, doc, getDoc, query, orderBy, onSnapshot
+    getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot
   } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
+  // IMPORTANTE: Insira sua apiKey válida do Console do Firebase abaixo
   const firebaseConfig = {
     apiKey: "AIzaSyAN8PKdOni3mJC-DvAFfjHI1ohBpi7eb28",
     authDomain: "agendaseven-428ad.firebaseapp.com",
@@ -528,23 +529,59 @@
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
-  // Expondo as funções necessárias do Firebase para o escopo global (window)
+  // Escuta atualizações do Firestore em tempo real
   window.carregarAgendamentosRealtime = function() {
     const q = query(collection(db, "agendamentos"), orderBy("service_date"));
     onSnapshot(q, (snapshot) => {
       let agendamentosFirebase = [];
-      snapshot.forEach((doc) => {
-        agendamentosFirebase.push({ id: doc.id, ...doc.data() });
+      snapshot.forEach((docSnap) => {
+        agendamentosFirebase.push({ id: docSnap.id, ...docSnap.data() });
       });
       
-      if(agendamentosFirebase.length > 0) {
-        agendamentos = agendamentosFirebase;
-        localStorage.setItem('seven_agendamentos', JSON.stringify(agendamentos));
-      }
+      agendamentos = agendamentosFirebase;
+      localStorage.setItem('seven_agendamentos', JSON.stringify(agendamentos));
+      
       gerarProximoNumeroRecibo();
       renderCalendario();
+      if (document.getElementById('telaResumo').classList.contains('ativo')) {
+        renderResumo();
+      }
+    }, (error) => {
+      console.warn("Firestore inacessível, utilizando LocalStorage:", error);
     });
-  }
+  };
+
+  // Funções globais de escrita no Firestore
+  window.salvarAgendamentoCloud = async function(dados) {
+    try {
+      const docRef = await addDoc(collection(db, "agendamentos"), dados);
+      return docRef.id;
+    } catch (e) {
+      console.error("Erro ao salvar no Firestore: ", e);
+      return null;
+    }
+  };
+
+  window.atualizarAgendamentoCloud = async function(id, dados) {
+    try {
+      const ref = doc(db, "agendamentos", id);
+      await updateDoc(ref, dados);
+      return true;
+    } catch (e) {
+      console.error("Erro ao atualizar no Firestore: ", e);
+      return false;
+    }
+  };
+
+  window.excluirAgendamentoCloud = async function(id) {
+    try {
+      await deleteDoc(doc(db, "agendamentos", id));
+      return true;
+    } catch (e) {
+      console.error("Erro ao excluir do Firestore: ", e);
+      return false;
+    }
+  };
 </script>
 
 <script>
@@ -562,13 +599,11 @@
   window.addEventListener('DOMContentLoaded', () => {
     document.getElementById("data").valueAsDate = new Date();
     
-    // Tenta carregar do Firebase se a função estiver disponível, senão inicia com o LocalStorage
     if (typeof window.carregarAgendamentosRealtime === 'function') {
       window.carregarAgendamentosRealtime();
-    } else {
-      gerarProximoNumeroRecibo();
-      renderCalendario();
     }
+    gerarProximoNumeroRecibo();
+    renderCalendario();
   });
 
   // ===== GERADOR DE NÚMERO DE RECIBO AUTOMÁTICO =====
@@ -609,8 +644,7 @@
     const nome  = document.getElementById('nomeCliente').value.trim();
     const data  = document.getElementById('data').value;
     const total = calcularTotal();
-    return {
-      id,
+    const payload = {
       receipt_number:  document.getElementById('numRecibo').value,
       client_name:      nome,
       client_address:  document.getElementById('enderecoCliente').value,
@@ -624,40 +658,68 @@
       notes:           document.getElementById('observacoes').value,
       total
     };
+    if (id) payload.id = id;
+    return payload;
   }
 
-  // ===== AÇÕES DOS BOTÕES =====
-  function salvarNaAgenda() {
+  // ===== AÇÕES DOS BOTÕES CONECTADAS NA NUVEM =====
+  async function salvarNaAgenda() {
     const nome = document.getElementById('nomeCliente').value.trim();
     const data = document.getElementById('data').value;
     if (!nome || !data) { alert('Preencha o Nome e a Data para agendar.'); return; }
-    const id = Date.now().toString();
-    agendamentos.push(capturar(id));
-    localStorage.setItem('seven_agendamentos', JSON.stringify(agendamentos));
+    
+    const novoDado = capturar();
+    
+    if (typeof window.salvarAgendamentoCloud === 'function') {
+      const cloudId = await window.salvarAgendamentoCloud(novoDado);
+      if (!cloudId) {
+        novoDado.id = Date.now().toString();
+        agendamentos.push(novoDado);
+        localStorage.setItem('seven_agendamentos', JSON.stringify(agendamentos));
+      }
+    } else {
+      novoDado.id = Date.now().toString();
+      agendamentos.push(novoDado);
+      localStorage.setItem('seven_agendamentos', JSON.stringify(agendamentos));
+    }
+    
     limparFormulario();
     renderCalendario();
     alert('Agendado para ' + nome + '!');
   }
 
-  function atualizarAgenda() {
+  async function atualizarAgenda() {
     const id   = document.getElementById('idEditando').value;
     const nome = document.getElementById('nomeCliente').value.trim();
     if (!id)   return;
     if (!nome) { alert('O nome do cliente não pode estar vazio.'); return; }
+    
+    const dadosAtualizados = capturar(id);
+    
+    if (typeof window.atualizarAgendamentoCloud === 'function') {
+      await window.atualizarAgendamentoCloud(id, dadosAtualizados);
+    }
+    
     const idx = agendamentos.findIndex(a => a.id === id);
     if (idx !== -1) {
-      agendamentos[idx] = capturar(id);
+      agendamentos[idx] = dadosAtualizados;
       localStorage.setItem('seven_agendamentos', JSON.stringify(agendamentos));
-      limparFormulario();
-      renderCalendario();
-      alert('Agendamento atualizado com sucesso!');
     }
+    
+    limparFormulario();
+    renderCalendario();
+    alert('Agendamento atualizado com sucesso!');
   }
 
-  function excluirAgendamento() {
+  async function excluirAgendamento() {
     const id = document.getElementById('idEditando').value;
     if (!id) return;
     if (!confirm('Deseja excluir este agendamento?')) return;
+    
+    if (typeof window.excluirAgendamentoCloud === 'function') {
+      await window.excluirAgendamentoCloud(id);
+    }
+    
     agendamentos = agendamentos.filter(a => a.id !== id);
     localStorage.setItem('seven_agendamentos', JSON.stringify(agendamentos));
     limparFormulario();
