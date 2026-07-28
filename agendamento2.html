@@ -517,14 +517,15 @@
   } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
   // IMPORTANTE: Insira sua apiKey válida do Console do Firebase abaixo
-  const firebaseConfig = {
-    apiKey: "AIzaSyAN8PKdOni3mJC-DvAFfjHI1ohBpi7eb28",
-    authDomain: "agendaseven-428ad.firebaseapp.com",
-    projectId: "agendaseven-428ad",
-    storageBucket: "agendaseven-428ad.firebasestorage.app",
-    messagingSenderId: "908846325130",
-    appId: "1:908846325130:web:e5badefe60a02740bc3c73"
-  };
+ const firebaseConfig = {
+  apiKey: "AIzaSyAN8PKdOni3mJC-DvAFfjHI1ohBpi7eb28",
+  authDomain: "agendaseven-428ad.firebaseapp.com",
+  projectId: "agendaseven-428ad",
+  storageBucket: "agendaseven-428ad.firebasestorage.app",
+  messagingSenderId: "908846325130",
+  appId: "1:908846325130:web:e5badefe60a02740bc3c73",
+  measurementId: "G-JRKKZWRFCN"
+};
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
