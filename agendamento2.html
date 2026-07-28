@@ -288,11 +288,11 @@
       padding: 18px;
       border-left: 5px solid var(--azul-principal);
     }
-    .kpi-card.verde  { border-left-color: var(--cor-pago); }
-    .kpi-card.laranja{ border-left-color: var(--cor-pendente); }
+    .kpi-card.verde   { border-left-color: var(--cor-pago); }
+    .kpi-card.laranja { border-left-color: var(--cor-pendente); }
     .kpi-label { font-size: 11px; font-weight: bold; color: #666; text-transform: uppercase; margin-bottom: 8px; }
     .kpi-value { font-size: 24px; font-weight: 900; color: var(--azul-principal); }
-    .kpi-card.verde .kpi-value  { color: var(--cor-pago); }
+    .kpi-card.verde .kpi-value   { color: var(--cor-pago); }
     .kpi-card.laranja .kpi-value { color: var(--cor-pendente); }
     .secao-titulo {
       font-size: 12px;
@@ -315,6 +315,7 @@
       background: var(--azul-claro);
       border-radius: 6px;
       margin-bottom: 6px;
+      cursor: pointer;
     }
     .recibo-nome { font-weight: 600; font-size: 13px; }
     .recibo-meta { font-size: 11px; color: #666; display: flex; gap: 6px; align-items: center; }
@@ -329,6 +330,7 @@
       .container { padding: 40px; }
       .header { flex-direction: row; justify-content: space-between; align-items: flex-start; }
       .row { flex-direction: row; }
+      .col-20 { width: 20%; flex-shrink: 0; }
       .col-30 { width: 30%; flex-shrink: 0; }
       .col-40 { width: 40%; flex-shrink: 0; }
       .col-50 { width: 50%; flex-shrink: 0; }
@@ -342,6 +344,7 @@
     }
 
     @media print {
+      button { display: none !important; }
       body { background: #fff; padding: 0; }
       .container { box-shadow: none; max-width: 100%; }
       .btn-container, .agenda-container, .resumo-container { display: none !important; }
@@ -394,13 +397,6 @@
     </div>
   </div>
 
- <div class="row">
-    <div class="col">
-      <label>Telafone</label>
-      <input type="text" id="enderecoCliente" placeholder="telefone">
-    </div>
-  </div>
-  
   <div class="row">
     <div class="col">
       <label>Descrição do Serviço</label>
@@ -436,18 +432,30 @@
     <div class="col col-30">
       <label>Status do Pagamento</label>
       <select id="statusPagamento">
-        <option value="Pago">🟢 Pago</option>
-        <option value="Pendente">🟡 Pendente</option>
+        <option value="Pago">Pago</option>
+        <option value="Pendente">Pendente</option>
       </select>
     </div>
+  </div>
 
-<div class="row">
-    <div class="col col-40">
+  <div class="row">
+    <div class="col">
       <label>Observações</label>
       <input type="text" id="observacoes" placeholder="Opcional">
     </div>
   </div>
-</div>
+  
+  <div class="row">
+    <div class="col">
+      <label>Telefone</label>
+      <div style="display:flex;gap:10px;">
+        <input type="text" id="telefoneCliente" placeholder="(48) 99999-9999" style="flex:1;">
+        <button type="button" class="btn" style="background:#25D366;padding:0 18px;" onclick="abrirWhatsapp()">
+          WhatsApp
+        </button>
+      </div>
+    </div>
+  </div>
 
   <div class="total-box">
     <span class="total-label">TOTAL GERAL</span>
@@ -526,39 +534,32 @@
     getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot
   } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
-  // IMPORTANTE: Insira sua apiKey válida do Console do Firebase abaixo
- // Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+  const firebaseConfig = {
+    apiKey: "AIzaSyAN8PKdOni3mJC-DvAFfjHI1ohBpi7eb28",
+    authDomain: "agendaseven-428ad.firebaseapp.com",
+    projectId: "agendaseven-428ad",
+    storageBucket: "agendaseven-428ad.firebasestorage.app",
+    messagingSenderId: "908846325130",
+    appId: "1:908846325130:web:e5badefe60a02740bc3c73",
+    measurementId: "G-JRKKZWRFCN"
+  };
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyAN8PKdOni3mJC-DvAFfjHI1ohBpi7eb28",
-  authDomain: "agendaseven-428ad.firebaseapp.com",
-  projectId: "agendaseven-428ad",
-  storageBucket: "agendaseven-428ad.firebasestorage.app",
-  messagingSenderId: "908846325130",
-  appId: "1:908846325130:web:e5badefe60a02740bc3c73",
-  measurementId: "G-JRKKZWRFCN"
-};
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
   // Escuta atualizações do Firestore em tempo real
   window.carregarAgendamentosRealtime = function() {
     const q = query(collection(db, "agendamentos"), orderBy("service_date"));
     onSnapshot(q, (snapshot) => {
       let agendamentosFirebase = [];
       snapshot.forEach((docSnap) => {
-        agendamentosFirebase.push({ id: docSnap.id, ...docSnap.data() });
-      });
+        agendamentosFirebase.push({
+          id: docSnap.id,
+          ...docSnap.data()
+        });
+      });     
       
       agendamentos = agendamentosFirebase;
-      localStorage.setItem('seven_agendamentos', JSON.stringify(agendamentos));
       
       gerarProximoNumeroRecibo();
       renderCalendario();
@@ -566,7 +567,7 @@ const analytics = getAnalytics(app);
         renderResumo();
       }
     }, (error) => {
-      console.warn("Firestore inacessível, utilizando LocalStorage:", error);
+      console.warn("Erro de conexão ao Firestore:", error);
     });
   };
 
@@ -586,8 +587,8 @@ const analytics = getAnalytics(app);
       const ref = doc(db, "agendamentos", id);
       await updateDoc(ref, dados);
       return true;
-    } catch (e) {
-      console.error("Erro ao atualizar no Firestore: ", e);
+    } catch(e){
+      console.error(e);
       return false;
     }
   };
@@ -605,7 +606,7 @@ const analytics = getAnalytics(app);
 
 <script>
   // ===== ESTADO =====
-  let agendamentos = JSON.parse(localStorage.getItem('seven_agendamentos')) || [];
+  let agendamentos = [];
   let calMes = new Date();
   calMes.setDate(1);
   let resumoMes = new Date();
@@ -618,12 +619,33 @@ const analytics = getAnalytics(app);
   window.addEventListener('DOMContentLoaded', () => {
     document.getElementById("data").valueAsDate = new Date();
     
+    // MÁSCARA TELEFONE
+    const telefone = document.getElementById("telefoneCliente");
+    telefone.addEventListener("input", function(e){
+      let v = e.target.value.replace(/\D/g,'');
+      if(v.length > 11) v = v.slice(0,11);
+      if(v.length > 10){
+        v = v.replace(/^(\d{2})(\d{5})(\d{4}).*/, "($1) $2-$3");
+      }else{
+        v = v.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, "($1) $2-$3");
+      }
+      e.target.value = v;
+    });
+
     if (typeof window.carregarAgendamentosRealtime === 'function') {
       window.carregarAgendamentosRealtime();
     }
     gerarProximoNumeroRecibo();
-    renderCalendario();
   });
+
+  function abrirWhatsapp(){
+    const telefone = document.getElementById("telefoneCliente").value.replace(/\D/g,'');
+    if(!telefone){
+      alert("Cliente sem telefone.");
+      return;
+    }
+    window.open("https://wa.me/55"+telefone, "_blank");
+  }
 
   // ===== GERADOR DE NÚMERO DE RECIBO AUTOMÁTICO =====
   function gerarProximoNumeroRecibo() {
@@ -665,8 +687,9 @@ const analytics = getAnalytics(app);
     const total = calcularTotal();
     const payload = {
       receipt_number:  document.getElementById('numRecibo').value,
-      client_name:      nome,
+      client_name:     nome,
       client_address:  document.getElementById('enderecoCliente').value,
+      phone:           document.getElementById("telefoneCliente").value,
       service_date:    data,
       description:     document.getElementById('descricao').value,
       quantity:        parseFloat(document.getElementById('quantidade').value) || 1,
@@ -682,73 +705,65 @@ const analytics = getAnalytics(app);
   }
 
   // ===== AÇÕES DOS BOTÕES CONECTADAS NA NUVEM =====
-  async function salvarNaAgenda() {
+  async function salvarNaAgenda(){
     const nome = document.getElementById('nomeCliente').value.trim();
     const data = document.getElementById('data').value;
-    if (!nome || !data) { alert('Preencha o Nome e a Data para agendar.'); return; }
-    
-    const novoDado = capturar();
-    
-    if (typeof window.salvarAgendamentoCloud === 'function') {
-      const cloudId = await window.salvarAgendamentoCloud(novoDado);
-      if (!cloudId) {
-        novoDado.id = Date.now().toString();
-        agendamentos.push(novoDado);
-        localStorage.setItem('seven_agendamentos', JSON.stringify(agendamentos));
-      }
+
+    if(!nome || !data){
+      alert("Preencha Nome e Data.");
+      return;
+    }
+
+    const dados = capturar();
+
+    const existe = agendamentos.find(
+      a => a.receipt_number === dados.receipt_number
+    );
+
+    if(existe){
+      alert("Este número de recibo já existe.");
+      return;
+    }
+
+    await window.salvarAgendamentoCloud(dados);
+    limparFormulario();
+    alert("Agendamento salvo!");
+  }
+
+  async function atualizarAgenda(){
+    const id = document.getElementById("idEditando").value;
+    if(!id) return;
+
+    const dados = capturar(id);
+    const ok = await window.atualizarAgendamentoCloud(id, dados);
+
+    if(ok){
+      alert("Atualizado com sucesso.");
+      limparFormulario();
     } else {
-      novoDado.id = Date.now().toString();
-      agendamentos.push(novoDado);
-      localStorage.setItem('seven_agendamentos', JSON.stringify(agendamentos));
+      alert("Erro ao atualizar.");
     }
-    
-    limparFormulario();
-    renderCalendario();
-    alert('Agendado para ' + nome + '!');
   }
 
-  async function atualizarAgenda() {
-    const id   = document.getElementById('idEditando').value;
-    const nome = document.getElementById('nomeCliente').value.trim();
-    if (!id)   return;
-    if (!nome) { alert('O nome do cliente não pode estar vazio.'); return; }
-    
-    const dadosAtualizados = capturar(id);
-    
-    if (typeof window.atualizarAgendamentoCloud === 'function') {
-      await window.atualizarAgendamentoCloud(id, dadosAtualizados);
-    }
-    
-    const idx = agendamentos.findIndex(a => a.id === id);
-    if (idx !== -1) {
-      agendamentos[idx] = dadosAtualizados;
-      localStorage.setItem('seven_agendamentos', JSON.stringify(agendamentos));
-    }
-    
-    limparFormulario();
-    renderCalendario();
-    alert('Agendamento atualizado com sucesso!');
-  }
+  async function excluirAgendamento(){
+    const id = document.getElementById("idEditando").value;
+    if(!id) return;
 
-  async function excluirAgendamento() {
-    const id = document.getElementById('idEditando').value;
-    if (!id) return;
-    if (!confirm('Deseja excluir este agendamento?')) return;
-    
-    if (typeof window.excluirAgendamentoCloud === 'function') {
-      await window.excluirAgendamentoCloud(id);
+    if(confirm("Deseja realmente excluir este agendamento?")){
+      const ok = await window.excluirAgendamentoCloud(id);
+      if(ok){
+        alert("Excluído com sucesso.");
+        limparFormulario();
+      } else {
+        alert("Erro ao excluir.");
+      }
     }
-    
-    agendamentos = agendamentos.filter(a => a.id !== id);
-    localStorage.setItem('seven_agendamentos', JSON.stringify(agendamentos));
-    limparFormulario();
-    renderCalendario();
-    alert('Agendamento excluído.');
   }
 
   function carregarAgendamento(id) {
     const a = agendamentos.find(x => x.id === id);
     if (!a) return;
+    document.getElementById("telefoneCliente").value = a.phone || "";
     document.getElementById('idEditando').value      = id;
     document.getElementById('numRecibo').value       = a.receipt_number || '0010';
     document.getElementById('nomeCliente').value     = a.client_name    || '';
@@ -771,6 +786,7 @@ const analytics = getAnalytics(app);
   }
 
   function limparFormulario() {
+    document.getElementById('telefoneCliente').value = '';
     document.getElementById('idEditando').value      = '';
     document.getElementById('nomeCliente').value     = '';
     document.getElementById('enderecoCliente').value = '';
@@ -922,44 +938,43 @@ const analytics = getAnalytics(app);
           <div class="pagamento-row">
             <div class="pagamento-info">
               <span style="font-weight:600;color:#333;">${method}</span>
-              <span style="font-weight:bold;color:#0f4c81;">R$ ${fmtBRL(value)}</span>
+              <span>R$ ${fmtBRL(value)} (${pct.toFixed(0)}%)</span>
             </div>
             <div class="pagamento-bar-bg">
-              <div class="pagamento-bar" style="width:${pct}%"></div>
+              <div class="pagamento-bar" style="width: ${pct}%"></div>
             </div>
-          </div>`;
+          </div>
+        `;
       });
     }
 
     // Lista de Recibos
-    document.getElementById('recibosSecaoTitulo').textContent = 'Recibos do Mês (' + numAtend + ')';
     const recibosDiv = document.getElementById('recibosLista');
+    document.getElementById('recibosSecaoTitulo').textContent = `Recibos do Mês (${lista.length})`;
     recibosDiv.innerHTML = '';
 
     if (lista.length === 0) {
-      recibosDiv.innerHTML = '<div class="vazio">Nenhum atendimento registrado neste mês.</div>';
+      recibosDiv.innerHTML = '<div class="vazio">Nenhum recibo neste mês.</div>';
     } else {
-      const ordenado = [...lista].sort((a, b) => a.service_date.localeCompare(b.service_date));
-      ordenado.forEach(a => {
-        const dataParts = a.service_date.split('-');
-        const dataFmt   = dataParts[2] + '/' + dataParts[1];
-        const statusLabel = a.payment_status || 'Pago';
-        const tagClass = statusLabel.toLowerCase();
-        
+      lista.forEach(a => {
+        const isPago = a.payment_status !== 'Pendente';
         recibosDiv.innerHTML += `
-          <div class="recibo-row">
+          <div class="recibo-row" onclick="fecharResumo(); carregarAgendamento('${a.id}');">
             <div>
-              <div class="recibo-nome">${a.client_name}</div>
+              <div class="recibo-nome">${a.client_name || 'Sem nome'}</div>
               <div class="recibo-meta">
-                <span>${dataFmt} · ${a.payment_method} · Nº ${a.receipt_number}</span>
-                <span class="status-tag ${tagClass}">${statusLabel}</span>
+                <span>Nº ${a.receipt_number || '---'}</span> • 
+                <span>${a.service_date ? a.service_date.split('-').reverse().join('/') : ''}</span>
+                <span class="status-tag ${isPago ? 'pago' : 'pendente'}">${a.payment_status || 'Pago'}</span>
               </div>
             </div>
             <div class="recibo-valor">R$ ${fmtBRL(a.total || 0)}</div>
-          </div>`;
+          </div>
+        `;
       });
     }
   }
 </script>
+
 </body>
 </html>
