@@ -517,29 +517,27 @@
   } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
   // IMPORTANTE: Insira sua apiKey válida do Console do Firebase abaixo
- <script type="module">
-  // 1. Importe o initializeApp e o getFirestore
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
-  import { getFirestore } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+ // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
 
-  // 2. Configuração do seu projeto
-  const firebaseConfig = {
-    apiKey: "AIzaSyAN8PKdOni3mJC-DvAFfjHI1ohBpi7eb28",
-    authDomain: "agendaseven-428ad.firebaseapp.com",
-    projectId: "agendaseven-428ad",
-    storageBucket: "agendaseven-428ad.firebasestorage.app",
-    messagingSenderId: "908846325130",
-    appId: "1:908846325130:web:e5badefe60a02740bc3c73"
-  };
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyAN8PKdOni3mJC-DvAFfjHI1ohBpi7eb28",
+  authDomain: "agendaseven-428ad.firebaseapp.com",
+  projectId: "agendaseven-428ad",
+  storageBucket: "agendaseven-428ad.firebasestorage.app",
+  messagingSenderId: "908846325130",
+  appId: "1:908846325130:web:e5badefe60a02740bc3c73",
+  measurementId: "G-JRKKZWRFCN"
+};
 
-  // 3. Inicialize o App
-  const app = initializeApp(firebaseConfig);
-
-  // 4. Inicialize o Firestore
-  const db = getFirestore(app);
-
-  console.log("Firestore conectado com sucesso!");
-</script>
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
   // Escuta atualizações do Firestore em tempo real
   window.carregarAgendamentosRealtime = function() {
     const q = query(collection(db, "agendamentos"), orderBy("service_date"));
