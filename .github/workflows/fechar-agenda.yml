@@ -14,36 +14,52 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
-
           p=Path('agendamento2.html')
           s=p.read_text(encoding='utf-8')
 
-          # O código antigo chamava window.sevenAuthState antes do módulo
-          # Firebase terminar de inicializar. Isso interrompia todo o script
-          # clássico da agenda e fazia os botões parecerem sem ação.
-          s=s.replace("window.sevenAuthState(window.sevenAuth,user=>{const b=document.getElementById('btnFecharAgenda');if(b)b.title=user?'Administrador conectado':'Login necessário para alterar a agenda'});\n", "")
+          # Corrige o erro de sintaxe que interrompia TODO o script da agenda.
+          # O onclick do botão "Reabrir" estava quebrando a string JavaScript.
+          s=s.replace("onclick=\"removerDiaFechado(''+d+'')\"", "onclick=\"removerDiaFechado(\\''+d+'\\')\"")
 
-          # Garante que o botão continue ligado à função administrativa mesmo
-          # que algum HTML antigo tenha perdido o onclick.
-          marker='<button id="btnFecharAgenda" class="btn red" onclick="alternarAgenda()">'
-          if marker in s and 'id="sevenAgendaClickFix"' not in s:
-              fix='''<script id="sevenAgendaClickFix">document.addEventListener('DOMContentLoaded',function(){var b=document.getElementById('btnFecharAgenda');if(b){b.addEventListener('click',function(e){if(typeof window.alternarAgenda==='function'){e.preventDefault();window.alternarAgenda();}},true);}});</script>'''
-              pos=s.rfind('</body>')
-              if pos<0: raise SystemExit('</body> não encontrado')
-              s=s[:pos]+fix+'\n'+s[pos:]
+          # Remove chamada antiga/prematura do Auth, caso ainda exista.
+          s=s.replace("window.sevenAuthState(window.sevenAuth,user=>{const b=document.getElementById('btnFecharAgenda');if(b)b.title=user?'Administrador conectado':'Login necessário para alterar a agenda'});\n", "")
 
           p.write_text(s,encoding='utf-8')
 
-      - name: Validar
+      - name: Validar estrutura
         shell: python
         run: |
           from pathlib import Path
           s=Path('agendamento2.html').read_text(encoding='utf-8')
-          if 'window.sevenAuthState(window.sevenAuth' in s:
-              raise SystemExit('Chamada prematura do Firebase Authentication ainda presente')
-          for x in ['window.alternarAgenda=async function','window.adicionarDiaFechado=async function','id="btnFecharAgenda"','id="dataFecharAgenda"']:
-              if x not in s: raise SystemExit('Função/elemento ausente: '+x)
-          print('VALIDAÇÃO OK: JavaScript dos controles da agenda corrigido.')
+          if "onclick=\"removerDiaFechado(''+d+'')\"" in s:
+              raise SystemExit('Erro de aspas ainda presente')
+          for x in [
+            'window.alternarAgenda=async function',
+            'window.adicionarDiaFechado=async function',
+            'window.renderDiasFechados=function',
+            'id="btnFecharAgenda"',
+            'id="dataFecharAgenda"',
+            'firebase-auth.js'
+          ]:
+              if x not in s:
+                  raise SystemExit('Elemento ausente: '+x)
+          print('Estrutura da agenda validada.')
+
+      - name: Validar sintaxe do script principal
+        shell: python
+        run: |
+          from pathlib import Path
+          import re, subprocess, sys
+          html=Path('agendamento2.html').read_text(encoding='utf-8')
+          scripts=re.findall(r'<script(?![^>]*type="module")[^>]*>(.*?)</script>', html, flags=re.S)
+          # O maior script clássico contém calendário, clientes e controles.
+          js=max(scripts,key=len)
+          Path('/tmp/agenda-check.js').write_text(js,encoding='utf-8')
+          r=subprocess.run(['node','--check','/tmp/agenda-check.js'],capture_output=True,text=True)
+          print(r.stdout)
+          print(r.stderr)
+          if r.returncode!=0:
+              sys.exit(r.returncode)
 
       - name: Publicar
         run: |
@@ -53,6 +69,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "Nenhuma alteração necessária."
           else
-            git commit -m "Corrige botões fechar agenda e dias específicos"
+            git commit -m "Corrige JavaScript da agenda e restaura clientes e controles"
             git push
           fi
