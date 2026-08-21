@@ -1,4 +1,4 @@
-name: Proteger controle da agenda Seven
+name: Corrigir controle da agenda Seven
 on:
   push:
     branches: [main]
@@ -6,92 +6,116 @@ on:
 permissions:
   contents: write
 jobs:
-  atualizar:
+  corrigir:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Aplicar painel e autenticação administrativa
+      - name: Atualizar agendamento2.html e agendar4.html
         shell: python
         run: |
           from pathlib import Path
 
-          p=Path('agendamento2.html')
-          s=p.read_text(encoding='utf-8')
+          # ============================================================
+          # AGENDA ADMINISTRATIVA
+          # ============================================================
+          p = Path('agendamento2.html')
+          s = p.read_text(encoding='utf-8')
 
-          if '.admin-auth-overlay{' not in s:
-              marker='@media(max-width:600px)'
-              css='''.admin-auth-overlay{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;padding:18px;z-index:3000}.admin-auth-overlay.active{display:flex}.admin-auth-card{width:100%;max-width:390px;background:#fff;border-radius:16px;padding:24px;box-shadow:0 20px 60px #0006}.admin-auth-card h2{margin:0 0 7px;color:var(--azul)}.admin-auth-card p{color:#68707a;font-size:13px;line-height:1.45}.admin-auth-card input{margin:7px 0}.admin-auth-actions{display:flex;gap:8px;margin-top:10px}.admin-auth-msg{display:none;background:#fde8eb;color:#9d1d2d;border-radius:8px;padding:9px;margin-top:9px;font-size:12px}.admin-auth-msg.active{display:block}.admin-user{font-size:10px;color:#68707a;font-weight:800}'''
-              if marker not in s: raise SystemExit('CSS responsivo não encontrado')
-              s=s.replace(marker,css+marker,1)
-
+          panel = '''<div id="diasFechadosPainel" class="card" style="margin:14px 0"><div style="font-weight:900;color:var(--azul);margin-bottom:8px">📅 Fechar dias específicos</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><div style="flex:1;min-width:180px"><label>Data que não aceitará novos agendamentos</label><input id="dataFecharAgenda" type="date"></div><button class="btn orange" onclick="adicionarDiaFechado()">➕ Fechar este dia</button></div><div id="listaDiasFechados" style="margin-top:12px"></div></div>'''
           if 'id="diasFechadosPainel"' not in s:
-              alvo='<div class="cal-nav"><button onclick="mudarMes(-1)">‹</button>'
-              painel='<div id="diasFechadosPainel" class="card" style="margin:14px 0"><div style="font-weight:900;color:var(--azul);margin-bottom:8px">📅 Fechar dias específicos</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><div style="flex:1;min-width:180px"><label>Data que não aceitará novos agendamentos</label><input id="dataFecharAgenda" type="date"></div><button class="btn orange" onclick="adicionarDiaFechado()">➕ Fechar este dia</button></div><div id="listaDiasFechados" style="margin-top:12px"></div></div>'
-              if alvo not in s: raise SystemExit('Calendário não encontrado')
-              s=s.replace(alvo,painel+alvo,1)
+              marker = '<div class="cal-nav"><button onclick="mudarMes(-1)">‹</button>'
+              if marker not in s:
+                  raise SystemExit('Não encontrei o calendário de agendamento2.html')
+              s = s.replace(marker, panel + marker, 1)
+
+          auth_css = '.admin-auth-overlay{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;padding:18px;z-index:3000}.admin-auth-overlay.active{display:flex}.admin-auth-card{width:100%;max-width:390px;background:#fff;border-radius:16px;padding:24px;box-shadow:0 20px 60px #0006}.admin-auth-card h2{margin:0 0 7px;color:var(--azul)}.admin-auth-card p{color:#68707a;font-size:13px;line-height:1.45}.admin-auth-card input{margin:7px 0}.admin-auth-actions{display:flex;gap:8px;margin-top:10px}.admin-auth-msg{display:none;background:#fde8eb;color:#9d1d2d;border-radius:8px;padding:9px;margin-top:9px;font-size:12px}.admin-auth-msg.active{display:block}'
+          if '.admin-auth-overlay{' not in s:
+              marker = '@media(max-width:600px)'
+              if marker not in s: raise SystemExit('Não encontrei CSS responsivo')
+              s = s.replace(marker, auth_css + marker, 1)
 
           if 'id="adminAuthOverlay"' not in s:
-              modal='''<body><div id="adminAuthOverlay" class="admin-auth-overlay"><div class="admin-auth-card"><h2>🔐 Acesso administrativo</h2><p>Entre com a conta autorizada da Seven para fechar a agenda ou bloquear dias específicos.</p><input id="adminEmail" type="email" placeholder="E-mail administrativo" autocomplete="username"><input id="adminPassword" type="password" placeholder="Senha" autocomplete="current-password"><div class="admin-auth-actions"><button class="btn blue" onclick="loginAdmin()">Entrar</button><button class="btn gray" onclick="fecharLoginAdmin()">Cancelar</button></div><div id="adminAuthMsg" class="admin-auth-msg"></div></div></div>'''
-              if '<body>' not in s: raise SystemExit('Body não encontrado')
-              s=s.replace('<body>',modal,1)
+              modal = '''<div id="adminAuthOverlay" class="admin-auth-overlay"><div class="admin-auth-card"><h2>🔐 Acesso administrativo</h2><p>Entre com a conta administrativa da Seven para alterar a agenda.</p><input id="adminEmail" type="email" placeholder="E-mail administrativo" autocomplete="username"><input id="adminPassword" type="password" placeholder="Senha" autocomplete="current-password"><div class="admin-auth-actions"><button class="btn blue" onclick="loginAdmin()">Entrar</button><button class="btn gray" onclick="fecharLoginAdmin()">Cancelar</button></div><div id="adminAuthMsg" class="admin-auth-msg"></div></div></div>'''
+              marker = '<body>'
+              if marker not in s: raise SystemExit('Não encontrei body')
+              s = s.replace(marker, marker + modal, 1)
 
-          imp="import{getFirestore,collection,addDoc,updateDoc,deleteDoc,doc,query,orderBy,onSnapshot,setDoc,getDoc}from'https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js';"
-          if imp in s and 'firebase-auth.js' not in s:
-              s=s.replace(imp,imp+"\nimport{getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged}from'https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js';",1)
+          old_import = "import{initializeApp}from'https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js';import{getFirestore,collection,addDoc,updateDoc,deleteDoc,doc,query,orderBy,onSnapshot,setDoc,getDoc}from'https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js';"
+          new_import = old_import + "import{getAuth,signInWithEmailAndPassword,onAuthStateChanged}from'https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js';"
+          if 'firebase-auth.js' not in s:
+              if old_import not in s: raise SystemExit('Import Firebase atual não encontrado')
+              s = s.replace(old_import, new_import, 1)
 
-          old="const firebaseConfig={apiKey:'AIzaSyAN8PKdOni3mJC-DvAFfjHI1ohBpi7eb28',authDomain:'agendaseven-428ad.firebaseapp.com',projectId:'agendaseven-428ad',storageBucket:'agendaseven-428ad.firebasestorage.app',messagingSenderId:'908846325130',appId:'1:908846325130:web:e5badefe60a02740bc3c73',measurementId:'G-JRKKZWRFCN'};const db=getFirestore(initializeApp(firebaseConfig));"
-          new="const firebaseConfig={apiKey:'AIzaSyAN8PKdOni3mJC-DvAFfjHI1ohBpi7eb28',authDomain:'agendaseven-428ad.firebaseapp.com',projectId:'agendaseven-428ad',storageBucket:'agendaseven-428ad.firebasestorage.app',messagingSenderId:'908846325130',appId:'1:908846325130:web:e5badefe60a02740bc3c73',measurementId:'G-JRKKZWRFCN'};const app=initializeApp(firebaseConfig);const db=getFirestore(app);const auth=getAuth(app);"
-          if old in s: s=s.replace(old,new,1)
+          old_init = "const db=getFirestore(initializeApp(firebaseConfig));"
+          new_init = "const app=initializeApp(firebaseConfig);const db=getFirestore(app);const auth=getAuth(app);window.sevenAuth=auth;window.sevenSignIn=signInWithEmailAndPassword;window.sevenAuthState=onAuthStateChanged;"
+          if 'window.sevenAuth=auth' not in s:
+              if old_init not in s: raise SystemExit('Inicialização Firebase não encontrada')
+              s = s.replace(old_init, new_init, 1)
 
-          oldcfg="window.salvarConfigAgenda=async aberta=>{await setDoc(doc(db,'config','agenda'),{aberta,updated_at:Date.now()})};window.carregarConfigAgenda=async()=>{try{const x=await getDoc(doc(db,'config','agenda'));return x.exists()?x.data().aberta!==false:true}catch(e){console.error(e);return true}};"
-          if oldcfg in s:
-              newcfg="window.salvarConfigAgenda=async(aberta,dias)=>{if(!auth.currentUser)throw new Error('ADMIN_AUTH_REQUIRED');const ref=doc(db,'config','agenda');const x=await getDoc(ref);const base=x.exists()?x.data():{};await setDoc(ref,{...base,aberta,diasFechados:Array.isArray(dias)?dias:(base.diasFechados||[]),updated_at:Date.now(),updated_by:auth.currentUser.email||auth.currentUser.uid})};window.carregarConfigAgenda=async()=>{try{const x=await getDoc(doc(db,'config','agenda'));if(!x.exists())return{aberta:true,diasFechados:[]};const d=x.data();return{aberta:d.aberta!==false,diasFechados:Array.isArray(d.diasFechados)?d.diasFechados:[]}}catch(e){console.error(e);return{aberta:true,diasFechados:[]}}};"
-              s=s.replace(oldcfg,newcfg,1)
+          old_cfg = "window.salvarConfigAgenda=async aberta=>{await setDoc(doc(db,'config','agenda'),{aberta,updated_at:Date.now()})};window.carregarConfigAgenda=async()=>{try{const x=await getDoc(doc(db,'config','agenda'));return x.exists()?x.data().aberta!==false:true}catch(e){console.error(e);return true}};"
+          new_cfg = "window.salvarConfigAgenda=async(aberta,dias)=>{if(!window.sevenAuth.currentUser)throw new Error('ADMIN_AUTH_REQUIRED');const ref=doc(db,'config','agenda');const x=await getDoc(ref);const base=x.exists()?x.data():{};await setDoc(ref,{...base,aberta,diasFechados:Array.isArray(dias)?dias:(base.diasFechados||[]),updated_at:Date.now(),updated_by:window.sevenAuth.currentUser.email||window.sevenAuth.currentUser.uid})};window.carregarConfigAgenda=async()=>{try{const x=await getDoc(doc(db,'config','agenda'));if(!x.exists())return{aberta:true,diasFechados:[]};const d=x.data();return{aberta:d.aberta!==false,diasFechados:Array.isArray(d.diasFechados)?d.diasFechados:[]}}catch(e){console.error(e);return{aberta:true,diasFechados:[]}}};"
+          if old_cfg in s:
+              s = s.replace(old_cfg, new_cfg, 1)
+          elif 'window.carregarConfigAgenda=async()=>{' not in s:
+              raise SystemExit('Funções de configuração da agenda não encontradas')
 
           if 'window.diasFechados=[];' not in s:
-              alvo='var agendamentos=[];'
-              js="""var agendamentos=[];window.diasFechados=[];window.configAgenda={aberta:true,diasFechados:[]};
-window.abrirLoginAdmin=function(){document.getElementById('adminAuthMsg').classList.remove('active');document.getElementById('adminAuthOverlay').classList.add('active');setTimeout(()=>document.getElementById('adminEmail').focus(),50)};
-window.fecharLoginAdmin=function(){document.getElementById('adminAuthOverlay').classList.remove('active')};
-window.loginAdmin=async function(){const email=document.getElementById('adminEmail').value.trim();const pass=document.getElementById('adminPassword').value;if(!email||!pass){const m=document.getElementById('adminAuthMsg');m.textContent='Informe e-mail e senha.';m.classList.add('active');return}try{await signInWithEmailAndPassword(auth,email,pass);window.fecharLoginAdmin()}catch(e){console.error(e);const m=document.getElementById('adminAuthMsg');m.textContent='Não foi possível entrar. Confira o e-mail e a senha.';m.classList.add('active')}};
-window.renderDiasFechados=function(){const box=document.getElementById('listaDiasFechados');if(!box)return;const lista=[...window.diasFechados].sort();box.innerHTML=lista.length?lista.map(d=>'<div style="display:flex;justify-content:space-between;align-items:center;background:var(--claro);padding:8px 10px;border-radius:7px;margin:5px 0"><b>🔒 '+d.split('-').reverse().join('/')+'</b><button class="btn red" style="padding:5px 9px;font-size:11px" onclick="removerDiaFechado(\''+d+'\')">✕ Reabrir</button></div>').join(''):'<span style="color:#888;font-size:12px">Nenhum dia fechado.</span>'};
-window.adicionarDiaFechado=async function(){if(!auth.currentUser){window.abrirLoginAdmin();return}const d=document.getElementById('dataFecharAgenda')?.value;if(!d)return alert('Escolha uma data.');if(window.diasFechados.includes(d))return alert('Esse dia já está fechado.');try{window.diasFechados.push(d);window.diasFechados=[...new Set(window.diasFechados)].sort();await window.salvarConfigAgenda(window.agendaAberta,window.diasFechados);window.renderDiasFechados();alert('Dia '+d.split('-').reverse().join('/')+' fechado para novos agendamentos.')}catch(e){console.error(e);window.diasFechados=window.diasFechados.filter(x=>x!==d);alert('Não foi possível alterar o dia. Faça login administrativo e verifique as regras do Firestore.')}};
-window.removerDiaFechado=async function(d){if(!auth.currentUser){window.abrirLoginAdmin();return}try{window.diasFechados=window.diasFechados.filter(x=>x!==d);await window.salvarConfigAgenda(window.agendaAberta,window.diasFechados);window.renderDiasFechados()}catch(e){console.error(e);alert('Não foi possível reabrir este dia. Verifique as regras do Firestore.')}};
-"""
-              if alvo not in s: raise SystemExit('var agendamentos não encontrado')
-              s=s.replace(alvo,js,1)
+              marker = 'var agendamentos=[];'
+              if marker not in s: raise SystemExit('var agendamentos não encontrado')
+              js = '''var agendamentos=[];window.diasFechados=[];window.configAgenda={aberta:true,diasFechados:[]};window.abrirLoginAdmin=function(){document.getElementById('adminAuthMsg').classList.remove('active');document.getElementById('adminAuthOverlay').classList.add('active');setTimeout(()=>document.getElementById('adminEmail').focus(),50)};window.fecharLoginAdmin=function(){document.getElementById('adminAuthOverlay').classList.remove('active')};window.loginAdmin=async function(){const email=document.getElementById('adminEmail').value.trim(),pass=document.getElementById('adminPassword').value;if(!email||!pass){const m=document.getElementById('adminAuthMsg');m.textContent='Informe e-mail e senha.';m.classList.add('active');return}try{await window.sevenSignIn(window.sevenAuth,email,pass);window.fecharLoginAdmin()}catch(e){console.error(e);const m=document.getElementById('adminAuthMsg');m.textContent='Não foi possível entrar. Confira o e-mail e a senha.';m.classList.add('active')}};window.renderDiasFechados=function(){const box=document.getElementById('listaDiasFechados');if(!box)return;const lista=[...window.diasFechados].sort();box.innerHTML=lista.length?lista.map(d=>'<div style="display:flex;justify-content:space-between;align-items:center;background:var(--claro);padding:8px 10px;border-radius:7px;margin:5px 0"><b>🔒 '+d.split('-').reverse().join('/')+'</b><button class="btn red" style="padding:5px 9px;font-size:11px" onclick="removerDiaFechado(\''+d+'\')">✕ Reabrir</button></div>').join(''):'<span style="color:#888;font-size:12px">Nenhum dia fechado.</span>'};window.adicionarDiaFechado=async function(){if(!window.sevenAuth.currentUser){window.abrirLoginAdmin();return}const d=document.getElementById('dataFecharAgenda')?.value;if(!d)return alert('Escolha uma data.');if(window.diasFechados.includes(d))return alert('Esse dia já está fechado.');try{window.diasFechados=[...new Set([...window.diasFechados,d])].sort();await window.salvarConfigAgenda(window.agendaAberta,window.diasFechados);window.renderDiasFechados();document.getElementById('dataFecharAgenda').value='';alert('Dia '+d.split('-').reverse().join('/')+' fechado para novos agendamentos.')}catch(e){console.error(e);window.diasFechados=window.diasFechados.filter(x=>x!==d);alert('Não foi possível alterar o dia. Verifique o login administrativo e as regras do Firestore.')}};window.removerDiaFechado=async function(d){if(!window.sevenAuth.currentUser){window.abrirLoginAdmin();return}try{window.diasFechados=window.diasFechados.filter(x=>x!==d);await window.salvarConfigAgenda(window.agendaAberta,window.diasFechados);window.renderDiasFechados()}catch(e){console.error(e);alert('Não foi possível reabrir este dia.')}};'''
+              s = s.replace(marker, js, 1)
 
-          oldalt="window.alternarAgenda=async function(){const novo=!window.agendaAberta;if(!novo&&!confirm('Fechar a agenda? Novos clientes não poderão realizar agendamentos pelo site até você abrir novamente.'))return;try{await window.salvarConfigAgenda(novo);window.aplicarStatusAgenda(novo)}catch(e){console.error(e);alert('Não foi possível alterar o status da agenda.')}};"
-          if oldalt in s:
-              newalt="window.alternarAgenda=async function(){if(!auth.currentUser){window.abrirLoginAdmin();return}const novo=!window.agendaAberta;if(!novo&&!confirm('Fechar a agenda? Novos clientes não poderão realizar agendamentos pelo site até você abrir novamente.'))return;try{await window.salvarConfigAgenda(novo,window.diasFechados);window.aplicarStatusAgenda(novo)}catch(e){console.error(e);alert('Não foi possível alterar o status da agenda. Verifique se a conta administrativa está autorizada no Firestore.')}};"
-              s=s.replace(oldalt,newalt,1)
+          old_alt = "window.alternarAgenda=async function(){const novo=!window.agendaAberta;if(!novo&&!confirm('Fechar a agenda? Novos clientes não poderão realizar agendamentos pelo site até você abrir novamente.'))return;try{await window.salvarConfigAgenda(novo);window.aplicarStatusAgenda(novo)}catch(e){console.error(e);alert('Não foi possível alterar o status da agenda.')}};"
+          new_alt = "window.alternarAgenda=async function(){if(!window.sevenAuth.currentUser){window.abrirLoginAdmin();return}const novo=!window.agendaAberta;if(!novo&&!confirm('Fechar a agenda? Novos clientes não poderão realizar agendamentos pelo site até você abrir novamente.'))return;try{await window.salvarConfigAgenda(novo,window.diasFechados);window.aplicarStatusAgenda(novo)}catch(e){console.error(e);alert('Não foi possível alterar o status da agenda. Verifique o login administrativo e as regras do Firestore.')}};"
+          if old_alt in s: s=s.replace(old_alt,new_alt,1)
 
-          oldready="window.addEventListener('DOMContentLoaded',async()=>{window.aplicarStatusAgenda(await window.carregarConfigAgenda());const q=query(collection(db,'agendamentos'),orderBy('service_date'));"
-          if oldready in s:
-              newready="window.addEventListener('DOMContentLoaded',async()=>{window.configAgenda=await window.carregarConfigAgenda();window.diasFechados=window.configAgenda.diasFechados||[];window.aplicarStatusAgenda(window.configAgenda.aberta);window.renderDiasFechados();const q=query(collection(db,'agendamentos'),orderBy('service_date'));"
-              s=s.replace(oldready,newready,1)
+          old_ready="window.addEventListener('DOMContentLoaded',async()=>{window.aplicarStatusAgenda(await window.carregarConfigAgenda());const q=query(collection(db,'agendamentos'),orderBy('service_date'));"
+          new_ready="window.addEventListener('DOMContentLoaded',async()=>{window.configAgenda=await window.carregarConfigAgenda();window.diasFechados=window.configAgenda.diasFechados||[];window.aplicarStatusAgenda(window.configAgenda.aberta);window.renderDiasFechados();const q=query(collection(db,'agendamentos'),orderBy('service_date'));"
+          if old_ready in s: s=s.replace(old_ready,new_ready,1)
 
-          if 'onAuthStateChanged(auth' not in s:
-              s=s.replace('</script>\n<script>',"onAuthStateChanged(auth,user=>{const b=document.getElementById('btnFecharAgenda');if(b){b.title=user?'Administrador conectado: '+(user.email||''):'Login necessário para alterar a agenda'}if(user){window.fecharLoginAdmin()}});\n</script>\n<script>",1)
+          if 'sevenAuthState(window.sevenAuth' not in s:
+              marker='</script>\n<script>'
+              code="</script>\n<script>window.sevenAuthState(window.sevenAuth,user=>{const b=document.getElementById('btnFecharAgenda');if(b)b.title=user?'Administrador conectado':'Login necessário para alterar a agenda'});"
+              if marker in s: s=s.replace(marker,code,1)
 
           p.write_text(s,encoding='utf-8')
 
-          # ==================== FORMULÁRIO PÚBLICO ====================
+          # ============================================================
+          # FORMULÁRIO PÚBLICO
+          # ============================================================
           p=Path('agendar4.html')
           s=p.read_text(encoding='utf-8')
           if 'window.diasFechados=[];' not in s:
-              oldcheck="async function verificarAgendaAberta(){try{const x=await getDoc(doc(db,'config','agenda'));const aberta=!x.exists()||x.data().aberta!==false;if(!aberta){document.getElementById('agendaClosedOverlay').classList.add('active');document.querySelectorAll('button').forEach(b=>{if(b.id!=='new')b.disabled=true});}return aberta}catch(e){console.error(e);return true}}\nverificarAgendaAberta();"
-              if oldcheck not in s: raise SystemExit('verificarAgendaAberta não encontrado')
-              newcheck="""window.diasFechados=[];window.agendaAberta=true;async function verificarAgendaAberta(){try{const x=await getDoc(doc(db,'config','agenda'));const d=x.exists()?x.data():{};window.diasFechados=Array.isArray(d.diasFechados)?d.diasFechados:[];window.agendaAberta=d.aberta!==false;if(!window.agendaAberta){document.getElementById('agendaClosedOverlay').classList.add('active');document.querySelectorAll('button').forEach(b=>{if(b.id!=='new')b.disabled=true});}return window.agendaAberta}catch(e){console.error(e);return true}}
-verificarAgendaAberta();
-function dataSelecionada(){if(chosen&&chosen.date)return chosen.date;return document.querySelector('#days .day.selected')?.dataset?.date||''}
-function diaEstaFechado(d){return !!d&&window.diasFechados.includes(d)}
-"""
-              s=s.replace(oldcheck,newcheck,1)
-          if 'diaEstaFechado(dataSelecionada())' not in s:
-              alvo="$('cont').onclick=()=>{"
-              if alvo not in s: raise SystemExit('Botão cont não encontrado')
-              s=s.replace(alvo,"$('cont').onclick=()=>{if(diaEstaFechado(dataSelecionada())){error('A Seven não está aceitando novos agendamentos nesta data. Escolha outro dia.');return;}",1)
+              old="async function verificarAgendaAberta(){try{const x=await getDoc(doc(db,'config','agenda'));const aberta=!x.exists()||x.data().aberta!==false;if(!aberta){document.getElementById('agendaClosedOverlay').classList.add('active');document.querySelectorAll('button').forEach(b=>{if(b.id!=='new')b.disabled=true});}return aberta}catch(e){console.error(e);return true}}\nverificarAgendaAberta();"
+              new="window.diasFechados=[];window.agendaAberta=true;async function verificarAgendaAberta(){try{const x=await getDoc(doc(db,'config','agenda'));const d=x.exists()?x.data():{};window.diasFechados=Array.isArray(d.diasFechados)?d.diasFechados:[];window.agendaAberta=d.aberta!==false;if(!window.agendaAberta){document.getElementById('agendaClosedOverlay').classList.add('active');document.querySelectorAll('button').forEach(b=>{if(b.id!=='new')b.disabled=true});}return window.agendaAberta}catch(e){console.error(e);return true}}\nwindow.agendaConfigReady=verificarAgendaAberta();"
+              if old not in s: raise SystemExit('verificarAgendaAberta não encontrado em agendar4.html')
+              s=s.replace(old,new,1)
+
+          if 'window.agendaConfigReady' not in s:
+              raise SystemExit('Não foi possível instalar o carregamento da configuração')
+
+          # No carregamento dos horários, aguarda a configuração e não cria slots em dias fechados.
+          old_load="$('load').onclick=async()=>{clearError();if(!(await consultarCEP()))return;"
+          new_load="$('load').onclick=async()=>{clearError();await window.agendaConfigReady;if(!window.agendaAberta){return}if(!(await consultarCEP()))return;"
+          if old_load in s: s=s.replace(old_load,new_load,1)
+          else: raise SystemExit('Botão load não encontrado')
+
+          old_loop="const data=iso(d),ags=await agendamentos(data),card=document.createElement('div');card.className='day';card.innerHTML='<b>'+d.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit'})+'</b>';const grid=document.createElement('div');"
+          new_loop="const data=iso(d),card=document.createElement('div');card.className='day';card.innerHTML='<b>'+d.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit'})+'</b>';if(window.diasFechados.includes(data)){card.innerHTML+='<div style=\"margin-top:8px;color:#9d1d2d;font-weight:800\">🔒 Data indisponível</div>';\$('days').appendChild(card);continue}const ags=await agendamentos(data);const grid=document.createElement('div');"
+          if old_loop in s: s=s.replace(old_loop,new_loop,1)
+          else: raise SystemExit('Loop de dias não encontrado')
+
+          old_cont="$('cont').onclick=()=>{if(!chosen)return;"
+          new_cont="$('cont').onclick=()=>{if(chosen&&window.diasFechados.includes(chosen.date)){error('A Seven não está aceitando novos agendamentos nesta data. Escolha outro dia.');return}if(!chosen)return;"
+          if old_cont in s: s=s.replace(old_cont,new_cont,1)
+          else: raise SystemExit('Botão cont não encontrado')
+
+          # Na confirmação, consulta novamente o documento para evitar corrida caso o dia seja fechado enquanto o cliente está preenchendo.
+          old_send="$('send').onclick=async()=>{clearError();const i=info();"
+          new_send="$('send').onclick=async()=>{clearError();const cfg=await getDoc(doc(db,'config','agenda'));const cd=cfg.exists()?cfg.data():{};const bloqueados=Array.isArray(cd.diasFechados)?cd.diasFechados:[];if(cd.aberta===false){error('A agenda está temporariamente fechada.');return}if(chosen&&bloqueados.includes(chosen.date)){error('Esta data não está mais disponível. Escolha outro dia.');show(3);return}const i=info();"
+          if old_send in s: s=s.replace(old_send,new_send,1)
+          else: raise SystemExit('Botão send não encontrado')
+
           p.write_text(s,encoding='utf-8')
 
       - name: Validar
@@ -100,15 +124,22 @@ function diaEstaFechado(d){return !!d&&window.diasFechados.includes(d)}
           from pathlib import Path
           a=Path('agendamento2.html').read_text(encoding='utf-8')
           b=Path('agendar4.html').read_text(encoding='utf-8')
-          for x in ['diasFechadosPainel','firebase-auth.js','signInWithEmailAndPassword','ADMIN_AUTH_REQUIRED','adicionarDiaFechado']:
+          checks_a=['diasFechadosPainel','adminAuthOverlay','firebase-auth.js','window.sevenAuth=auth','adicionarDiaFechado','window.diasFechados=[]']
+          checks_b=['window.diasFechados=[]','window.agendaConfigReady','Data indisponível','bloqueados.includes(chosen.date)']
+          for x in checks_a:
               if x not in a: raise SystemExit('agendamento2.html sem '+x)
-          for x in ['diasFechados','diaEstaFechado']:
+          for x in checks_b:
               if x not in b: raise SystemExit('agendar4.html sem '+x)
-          print('OK: autenticação administrativa e bloqueio por dias instalados.')
+          print('VALIDAÇÃO OK: controle administrativo e dias específicos presentes.')
 
-      - name: Publicar
+      - name: Publicar alterações
         run: |
           git config user.name "Seven Agenda Bot"
           git config user.email "actions@users.noreply.github.com"
           git add agendamento2.html agendar4.html
-          if git diff --cached --quiet; then echo "Nenhuma alteração necessária."; else git commit -m "Protege controle da agenda com Firebase Authentication"; git push; fi
+          if git diff --cached --quiet; then
+            echo "Arquivos já estavam atualizados."
+          else
+            git commit -m "Ativa fechamento de agenda e bloqueio por dias"
+            git push
+          fi
