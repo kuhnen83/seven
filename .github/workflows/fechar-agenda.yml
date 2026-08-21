@@ -1,0 +1,55 @@
+name: Configurar fechamento manual da agenda
+on:
+  push:
+    paths-ignore:
+      - '.github/workflows/fechar-agenda.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Aplicar fechamento da agenda
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('agendamento2.html'); s=p.read_text(encoding='utf-8')
+          if 'id="agendaStatusBadge"' not in s:
+              old='<div class="agenda-container" id="telaAgenda"><h2 class="agenda-title">🗓️ Agenda de Clientes - Seven</h2>'
+              new='''<div class="agenda-container" id="telaAgenda"><div class="agenda-head"><h2 class="agenda-title">🗓️ Agenda de Clientes - Seven</h2><div class="agenda-control"><span id="agendaStatusBadge" class="agenda-open">🟢 AGENDA ABERTA</span><button id="btnFecharAgenda" class="btn red" onclick="alternarAgenda()">🔒 Fechar agenda</button></div></div>'''
+              if old not in s: raise SystemExit('alvo agendamento2 HTML não encontrado')
+              s=s.replace(old,new,1)
+              s=s.replace('.agenda-container{padding:20px}', '.agenda-container{padding:20px}.agenda-head{display:flex;align-items:center;justify-content:space-between;gap:15px;border-bottom:2px solid var(--claro);padding-bottom:10px}.agenda-head .agenda-title{border:0;padding:0;margin:0}.agenda-control{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.agenda-control .btn{padding:9px 12px;font-size:12px}.agenda-open,.agenda-closed{font-size:11px;font-weight:900;padding:8px 10px;border-radius:18px}.agenda-open{background:#e8f7ee;color:#168b57}.agenda-closed{background:#fde8eb;color:#b42332}',1)
+              target="window.excluirAgendamentoCloud=async id=>{try{await deleteDoc(doc(db,'agendamentos',id));return true}catch(e){console.error(e);return false}};"
+              replacement=target+"window.salvarConfigAgenda=async aberta=>{await setDoc(doc(db,'config','agenda'),{aberta,updated_at:Date.now()})};window.carregarConfigAgenda=async()=>{try{const x=await getDoc(doc(db,'config','agenda'));return x.exists()?x.data().aberta!==false:true}catch(e){console.error(e);return true}};"
+              if target not in s: raise SystemExit('alvo agendamento2 JS não encontrado')
+              s=s.replace(target,replacement,1)
+              s=s.replace("import{getFirestore,collection,addDoc,updateDoc,deleteDoc,doc,query,orderBy,onSnapshot}from", "import{getFirestore,collection,addDoc,updateDoc,deleteDoc,doc,query,orderBy,onSnapshot,setDoc,getDoc}from",1)
+              s=s.replace('var agendamentos=[];', "var agendamentos=[];window.agendaAberta=true;window.alternarAgenda=async function(){const novo=!window.agendaAberta;if(!novo&&!confirm('Fechar a agenda? Novos clientes não poderão realizar agendamentos pelo site até você abrir novamente.'))return;try{await window.salvarConfigAgenda(novo);window.aplicarStatusAgenda(novo)}catch(e){console.error(e);alert('Não foi possível alterar o status da agenda.')}};window.aplicarStatusAgenda=function(aberta){window.agendaAberta=aberta;const b=document.getElementById('agendaStatusBadge'),btn=document.getElementById('btnFecharAgenda');if(!b||!btn)return;b.className=aberta?'agenda-open':'agenda-closed';b.textContent=aberta?'🟢 AGENDA ABERTA':'🔴 AGENDA FECHADA';btn.textContent=aberta?'🔒 Fechar agenda':'🔓 Abrir agenda';btn.className='btn '+(aberta?'red':'green')};",1)
+              oldready="window.addEventListener('DOMContentLoaded',()=>{const q=query(collection(db,'agendamentos'),orderBy('service_date'));"
+              newready="window.addEventListener('DOMContentLoaded',async()=>{window.aplicarStatusAgenda(await window.carregarConfigAgenda());const q=query(collection(db,'agendamentos'),orderBy('service_date'));"
+              if oldready not in s: raise SystemExit('ready agendamento2 não encontrado')
+              s=s.replace(oldready,newready,1)
+              p.write_text(s,encoding='utf-8')
+          p=Path('agendar4.html'); s=p.read_text(encoding='utf-8')
+          if 'agendaClosedOverlay' not in s:
+              s=s.replace('@media(max-width:600px)', '.agenda-closed-overlay{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;padding:18px;z-index:9999}.agenda-closed-overlay.active{display:flex}.agenda-closed-card{max-width:430px;width:100%;background:#fff;border-radius:18px;padding:28px;text-align:center;box-shadow:0 15px 50px #0005}.agenda-closed-icon{font-size:48px}.agenda-closed-card h2{color:#0f4c81;margin:10px 0}.agenda-closed-card p{color:#68707a;line-height:1.5}.agenda-closed-card a{display:block;background:#20a45a;color:#fff;text-decoration:none;border-radius:9px;padding:14px;font-weight:800;margin-top:18px}@media(max-width:600px)',1)
+              s=s.replace('<body>\n<div class="wrap">', '''<body>
+<div id="agendaClosedOverlay" class="agenda-closed-overlay"><div class="agenda-closed-card"><div class="agenda-closed-icon">🔒</div><h2>Agenda temporariamente fechada</h2><p>No momento, a Seven está com a agenda fechada para novos agendamentos.</p><p>Entre em contato pelo WhatsApp para consultar disponibilidade.</p><a href="https://wa.me/5548996782471" target="_blank" rel="noopener">💬 Falar com a Seven pelo WhatsApp</a></div></div>
+<div class="wrap">''',1)
+              needle="const db=getFirestore(initializeApp(firebaseConfig));const $=id=>document.getElementById(id);let chosen=null;"
+              repl="""const db=getFirestore(initializeApp(firebaseConfig));const $=id=>document.getElementById(id);let chosen=null;
+async function verificarAgendaAberta(){try{const s=await getDocs(query(collection(db,'config'),where('__name__','==','agenda')));const aberta=s.empty?true:s.docs[0].data().aberta!==false;if(!aberta){document.getElementById('agendaClosedOverlay').classList.add('active');document.querySelectorAll('button').forEach(b=>{if(b.id!=='new')b.disabled=true})}return aberta}catch(e){console.error(e);return true}}
+verificarAgendaAberta();"""
+              if needle not in s: raise SystemExit('db alvo agendar4 não encontrado')
+              s=s.replace(needle,repl,1)
+              p.write_text(s,encoding='utf-8')
+      - name: Commit alterações
+        run: |
+          git config user.name "Seven Agenda Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add agendamento2.html agendar4.html
+          if git diff --cached --quiet; then echo "Sem alterações"; exit 0; fi
+          git commit -m "Adiciona abertura e fechamento manual da agenda"
+          git push
