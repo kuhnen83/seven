@@ -10,29 +10,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Corrigir JavaScript da agenda
+
+      - name: Corrigir JavaScript das páginas
         shell: python
         run: |
           from pathlib import Path
+
+          # ---------------- ADMIN ----------------
           p=Path('agendamento2.html')
           s=p.read_text(encoding='utf-8')
-
-          # Corrige o erro de sintaxe que interrompia TODO o script da agenda.
-          # O onclick do botão "Reabrir" estava quebrando a string JavaScript.
           s=s.replace("onclick=\"removerDiaFechado(''+d+'')\"", "onclick=\"removerDiaFechado(\\''+d+'\\')\"")
-
-          # Remove chamada antiga/prematura do Auth, caso ainda exista.
           s=s.replace("window.sevenAuthState(window.sevenAuth,user=>{const b=document.getElementById('btnFecharAgenda');if(b)b.title=user?'Administrador conectado':'Login necessário para alterar a agenda'});\n", "")
+          p.write_text(s,encoding='utf-8')
+
+          # ---------------- AGENDAMENTO PÚBLICO ----------------
+          p=Path('agendar4.html')
+          s=p.read_text(encoding='utf-8')
+
+          # Este caractere de escape inválido fazia o módulo inteiro falhar.
+          # Como consequência, os eventos de sofá/colchão não eram registrados
+          # e os preços/tamanhos não apareciam ao selecionar o serviço.
+          s=s.replace("\\$('days').appendChild(card);", "$('days').appendChild(card);")
 
           p.write_text(s,encoding='utf-8')
 
-      - name: Validar estrutura
+      - name: Validar estrutura administrativa
         shell: python
         run: |
           from pathlib import Path
           s=Path('agendamento2.html').read_text(encoding='utf-8')
           if "onclick=\"removerDiaFechado(''+d+'')\"" in s:
-              raise SystemExit('Erro de aspas ainda presente')
+              raise SystemExit('Erro de aspas ainda presente no admin')
           for x in [
             'window.alternarAgenda=async function',
             'window.adicionarDiaFechado=async function',
@@ -42,33 +50,61 @@ jobs:
             'firebase-auth.js'
           ]:
               if x not in s:
-                  raise SystemExit('Elemento ausente: '+x)
-          print('Estrutura da agenda validada.')
+                  raise SystemExit('Elemento ausente no admin: '+x)
 
-      - name: Validar sintaxe do script principal
+      - name: Validar estrutura do agendamento público
+        shell: python
+        run: |
+          from pathlib import Path
+          s=Path('agendar4.html').read_text(encoding='utf-8')
+          if "\\$('days').appendChild(card);" in s:
+              raise SystemExit('Escape inválido ainda presente em agendar4.html')
+          for x in [
+            "$('sofa').onchange=",
+            "$('col').onchange=",
+            "id=\"svs\" class=\"variants\"",
+            "id=\"cvs\" class=\"variants\"",
+            'R$ 149,00',
+            'R$ 209,00'
+          ]:
+              if x not in s:
+                  raise SystemExit('Elemento ausente no agendamento público: '+x)
+
+      - name: Validar sintaxe JavaScript do admin
         shell: python
         run: |
           from pathlib import Path
           import re, subprocess, sys
           html=Path('agendamento2.html').read_text(encoding='utf-8')
           scripts=re.findall(r'<script(?![^>]*type="module")[^>]*>(.*?)</script>', html, flags=re.S)
-          # O maior script clássico contém calendário, clientes e controles.
           js=max(scripts,key=len)
           Path('/tmp/agenda-check.js').write_text(js,encoding='utf-8')
           r=subprocess.run(['node','--check','/tmp/agenda-check.js'],capture_output=True,text=True)
-          print(r.stdout)
-          print(r.stderr)
-          if r.returncode!=0:
-              sys.exit(r.returncode)
+          print(r.stdout); print(r.stderr)
+          if r.returncode!=0: sys.exit(r.returncode)
+
+      - name: Validar sintaxe JavaScript do agendamento público
+        shell: python
+        run: |
+          from pathlib import Path
+          import re, subprocess, sys
+          html=Path('agendar4.html').read_text(encoding='utf-8')
+          m=re.search(r'<script type="module">(.*?)</script>',html,flags=re.S)
+          if not m:
+              raise SystemExit('Script module não encontrado em agendar4.html')
+          Path('/tmp/agendar4-check.mjs').write_text(m.group(1),encoding='utf-8')
+          r=subprocess.run(['node','--check','/tmp/agendar4-check.mjs'],capture_output=True,text=True)
+          print(r.stdout); print(r.stderr)
+          if r.returncode!=0: sys.exit(r.returncode)
 
       - name: Publicar
         run: |
           git config user.name "Seven Agenda Bot"
           git config user.email "actions@users.noreply.github.com"
-          git add agendamento2.html
+          git add agendamento2.html agendar4.html
           if git diff --cached --quiet; then
             echo "Nenhuma alteração necessária."
           else
-            git commit -m "Corrige JavaScript da agenda e restaura clientes e controles"
+            git commit -m "Corrige seleção de serviços e controles da agenda"
             git push
           fi
