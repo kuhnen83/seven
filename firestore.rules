@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Configuração da agenda: qualquer pessoa pode ler o status,
+    // mas somente usuários autenticados podem alterá-la.
+    match /config/agenda {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null;
+    }
+
+    // Mantém o comportamento atual da agenda de clientes.
+    // O controle administrativo acima é protegido separadamente.
+    match /agendamentos/{id} {
+      allow read, create, update, delete: if true;
+    }
+  }
+}
