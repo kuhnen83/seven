@@ -1,98 +1,95 @@
-name: Atualizar fechamento da agenda
+name: Aplicar controle de agenda Seven
 on:
   push:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: write
 jobs:
-  patch:
+  atualizar:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Atualizar os dois HTMLs
+      - name: Aplicar controle por dias
         shell: python
         run: |
           from pathlib import Path
 
-          # ---------- agendamento2.html ----------
-          p = Path('agendamento2.html')
-          s = p.read_text(encoding='utf-8')
+          # ==================== AGENDA ADMINISTRATIVA ====================
+          p=Path('agendamento2.html')
+          s=p.read_text(encoding='utf-8')
 
-          if 'id="agendaStatusBadge"' not in s:
-              old = '<div class="agenda-container" id="telaAgenda"><h2 class="agenda-title">🗓️ Agenda de Clientes - Seven</h2>'
-              new = '<div class="agenda-container" id="telaAgenda"><div class="agenda-head"><h2 class="agenda-title">🗓️ Agenda de Clientes - Seven</h2><div class="agenda-control"><span id="agendaStatusBadge" class="agenda-open">🟢 AGENDA ABERTA</span><button id="btnFecharAgenda" class="btn red" onclick="alternarAgenda()">🔒 Fechar agenda</button></div></div>'
-              if old not in s: raise SystemExit('Cabeçalho da agenda não encontrado')
-              s = s.replace(old, new, 1)
-
-          if '.agenda-head{' not in s:
-              s = s.replace('.agenda-container{padding:20px}', '.agenda-container{padding:20px}.agenda-head{display:flex;align-items:center;justify-content:space-between;gap:15px;border-bottom:2px solid var(--claro);padding-bottom:10px}.agenda-head .agenda-title{border:0;padding:0;margin:0}.agenda-control{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.agenda-control .btn{padding:9px 12px;font-size:12px}.agenda-open,.agenda-closed{font-size:11px;font-weight:900;padding:8px 10px;border-radius:18px}.agenda-open{background:#e8f7ee;color:#168b57}.agenda-closed{background:#fde8eb;color:#b42332}', 1)
-
-          # Painel de dias fechados
+          # Painel visual para escolher dias fechados
           if 'id="diasFechadosPainel"' not in s:
-              alvo = '<div class="cal-nav"><button onclick="mudarMes(-1)">‹</button>'
-              painel = '''<div id="diasFechadosPainel" class="card" style="margin:14px 0"><div style="font-weight:900;color:var(--azul);margin-bottom:8px">📅 Fechar dias específicos</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><div style="flex:1;min-width:180px"><label>Data que não aceitará novos agendamentos</label><input id="dataFecharAgenda" type="date"></div><button class="btn orange" onclick="adicionarDiaFechado()">➕ Fechar este dia</button></div><div id="listaDiasFechados" style="margin-top:12px"></div></div>'''
-              if alvo not in s: raise SystemExit('Navegação do calendário não encontrada')
-              s = s.replace(alvo, painel + alvo, 1)
+              alvo='<div class="cal-nav"><button onclick="mudarMes(-1)">‹</button>'
+              painel='<div id="diasFechadosPainel" class="card" style="margin:14px 0"><div style="font-weight:900;color:var(--azul);margin-bottom:8px">📅 Fechar dias específicos</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><div style="flex:1;min-width:180px"><label>Data que não aceitará novos agendamentos</label><input id="dataFecharAgenda" type="date"></div><button class="btn orange" onclick="adicionarDiaFechado()">➕ Fechar este dia</button></div><div id="listaDiasFechados" style="margin-top:12px"></div></div>'
+              if alvo not in s: raise SystemExit('Não encontrei o calendário de agendamento2.html')
+              s=s.replace(alvo,painel+alvo,1)
 
-          # Firestore: guardar abertura + dias fechados sem apagar a configuração existente
-          imp_old = "import{getFirestore,collection,addDoc,updateDoc,deleteDoc,doc,query,orderBy,onSnapshot,setDoc,getDoc}from"
-          imp_new = imp_old
-          if imp_old not in s:
-              imp_old2 = "import{getFirestore,collection,addDoc,updateDoc,deleteDoc,doc,query,orderBy,onSnapshot}from"
-              imp_new2 = "import{getFirestore,collection,addDoc,updateDoc,deleteDoc,doc,query,orderBy,onSnapshot,setDoc,getDoc}from"
-              if imp_old2 not in s: raise SystemExit('Import Firestore não encontrado')
-              s = s.replace(imp_old2, imp_new2, 1)
+          # Funções Firebase para configuração
+          old="window.salvarConfigAgenda=async aberta=>{await setDoc(doc(db,'config','agenda'),{aberta,updated_at:Date.now()})};window.carregarConfigAgenda=async()=>{try{const x=await getDoc(doc(db,'config','agenda'));return x.exists()?x.data().aberta!==false:true}catch(e){console.error(e);return true}};"
+          new="window.salvarConfigAgenda=async(aberta,dias)=>{const ref=doc(db,'config','agenda');const x=await getDoc(ref);const base=x.exists()?x.data():{};await setDoc(ref,{...base,aberta,diasFechados:Array.isArray(dias)?dias:(base.diasFechados||[]),updated_at:Date.now()})};window.carregarConfigAgenda=async()=>{try{const x=await getDoc(doc(db,'config','agenda'));if(!x.exists())return{aberta:true,diasFechados:[]};const d=x.data();return{aberta:d.aberta!==false,diasFechados:Array.isArray(d.diasFechados)?d.diasFechados:[]}}catch(e){console.error(e);return{aberta:true,diasFechados:[]}}};"
+          if old in s: s=s.replace(old,new,1)
 
-          old_cfg = "window.salvarConfigAgenda=async aberta=>{await setDoc(doc(db,'config','agenda'),{aberta,updated_at:Date.now()})};window.carregarConfigAgenda=async()=>{try{const x=await getDoc(doc(db,'config','agenda'));return x.exists()?x.data().aberta!==false:true}catch(e){console.error(e);return true}};"
-          new_cfg = "window.salvarConfigAgenda=async(aberta,dias)=>{const atual=await getDoc(doc(db,'config','agenda'));const base=atual.exists()?atual.data():{};await setDoc(doc(db,'config','agenda'),{...base,aberta,diasFechados:Array.isArray(dias)?dias:(base.diasFechados||[]),updated_at:Date.now()})};window.carregarConfigAgenda=async()=>{try{const x=await getDoc(doc(db,'config','agenda'));if(!x.exists())return{aberta:true,diasFechados:[]};const d=x.data();return{aberta:d.aberta!==false,diasFechados:Array.isArray(d.diasFechados)?d.diasFechados:[]}}catch(e){console.error(e);return{aberta:true,diasFechados:[]}}};"
-          if old_cfg in s: s=s.replace(old_cfg,new_cfg,1)
-
-          # Corrige leitura dos agendamentos
-          s = s.replace('window.agendamentos=s.docs.map(x=>({id:x.id,...x.data()}));', 'agendamentos=s.docs.map(x=>({id:x.id,...x.data()}));', 1)
-
+          # Variáveis e funções dos dias fechados
           if 'window.diasFechados=[];' not in s:
-              s = s.replace('var agendamentos=[];', "var agendamentos=[];window.diasFechados=[];window.configAgenda={aberta:true,diasFechados:[]};window.alternarAgenda=async function(){const novo=!window.agendaAberta;if(!novo&&!confirm('Fechar a agenda? Novos clientes não poderão realizar agendamentos pelo site até você abrir novamente.'))return;try{await window.salvarConfigAgenda(novo,window.diasFechados);window.aplicarStatusAgenda(novo)}catch(e){console.error(e);alert('Não foi possível alterar o status da agenda.')}};window.aplicarStatusAgenda=function(aberta){window.agendaAberta=aberta;const b=document.getElementById('agendaStatusBadge'),btn=document.getElementById('btnFecharAgenda');if(!b||!btn)return;b.className=aberta?'agenda-open':'agenda-closed';b.textContent=aberta?'🟢 AGENDA ABERTA':'🔴 AGENDA FECHADA';btn.textContent=aberta?'🔒 Fechar agenda':'🔓 Abrir agenda';btn.className='btn '+(aberta?'red':'green');};window.renderDiasFechados=function(){const box=document.getElementById('listaDiasFechados');if(!box)return;const lista=[...window.diasFechados].sort();box.innerHTML=lista.length?lista.map(d=>'<div style="display:flex;justify-content:space-between;align-items:center;background:var(--claro);padding:8px 10px;border-radius:7px;margin:5px 0"><b>'+d.split('-').reverse().join('/')+'</b><button class="btn red" style="padding:5px 9px;font-size:11px" onclick="removerDiaFechado(\''+d+'\')">✕ Reabrir</button></div>').join(''):'<span style="color:#888;font-size:12px">Nenhum dia fechado.</span>'};window.adicionarDiaFechado=async function(){const d=document.getElementById('dataFecharAgenda')?.value;if(!d)return alert('Escolha uma data.');if(window.diasFechados.includes(d))return alert('Esse dia já está fechado.');window.diasFechados.push(d);await window.salvarConfigAgenda(window.agendaAberta,window.diasFechados);window.renderDiasFechados();alert('Dia '+d.split('-').reverse().join('/')+' fechado para novos agendamentos.');};window.removerDiaFechado=async function(d){window.diasFechados=window.diasFechados.filter(x=>x!==d);await window.salvarConfigAgenda(window.agendaAberta,window.diasFechados);window.renderDiasFechados();alert('Dia '+d.split('-').reverse().join('/')+' reaberto.');};", 1)
+              alvo='var agendamentos=[];'
+              js="""var agendamentos=[];window.diasFechados=[];window.configAgenda={aberta:true,diasFechados:[]};
+window.renderDiasFechados=function(){const box=document.getElementById('listaDiasFechados');if(!box)return;const lista=[...window.diasFechados].sort();box.innerHTML=lista.length?lista.map(d=>'<div style="display:flex;justify-content:space-between;align-items:center;background:var(--claro);padding:8px 10px;border-radius:7px;margin:5px 0"><b>🔒 '+d.split('-').reverse().join('/')+'</b><button class="btn red" style="padding:5px 9px;font-size:11px" onclick="removerDiaFechado(\''+d+'\')">✕ Reabrir</button></div>').join(''):'<span style="color:#888;font-size:12px">Nenhum dia fechado.</span>'};
+window.adicionarDiaFechado=async function(){const d=document.getElementById('dataFecharAgenda')?.value;if(!d)return alert('Escolha uma data.');if(window.diasFechados.includes(d))return alert('Esse dia já está fechado.');window.diasFechados.push(d);window.diasFechados=[...new Set(window.diasFechados)].sort();await window.salvarConfigAgenda(window.agendaAberta,window.diasFechados);window.renderDiasFechados();alert('Dia '+d.split('-').reverse().join('/')+' fechado para novos agendamentos.');};
+window.removerDiaFechado=async function(d){window.diasFechados=window.diasFechados.filter(x=>x!==d);await window.salvarConfigAgenda(window.agendaAberta,window.diasFechados);window.renderDiasFechados();};
+"""
+              if alvo not in s: raise SystemExit('Não encontrei var agendamentos em agendamento2.html')
+              s=s.replace(alvo,js,1)
 
-          old_ready = "window.addEventListener('DOMContentLoaded',async()=>{window.aplicarStatusAgenda(await window.carregarConfigAgenda());const q=query(collection(db,'agendamentos'),orderBy('service_date'));"
-          new_ready = "window.addEventListener('DOMContentLoaded',async()=>{window.configAgenda=await window.carregarConfigAgenda();window.diasFechados=window.configAgenda.diasFechados||[];window.aplicarStatusAgenda(window.configAgenda.aberta);window.renderDiasFechados();const q=query(collection(db,'agendamentos'),orderBy('service_date'));"
-          if old_ready in s: s=s.replace(old_ready,new_ready,1)
+          # Carregar configuração incluindo dias fechados
+          oldready="window.addEventListener('DOMContentLoaded',async()=>{window.aplicarStatusAgenda(await window.carregarConfigAgenda());const q=query(collection(db,'agendamentos'),orderBy('service_date'));"
+          newready="window.addEventListener('DOMContentLoaded',async()=>{window.configAgenda=await window.carregarConfigAgenda();window.diasFechados=window.configAgenda.diasFechados||[];window.aplicarStatusAgenda(window.configAgenda.aberta);window.renderDiasFechados();const q=query(collection(db,'agendamentos'),orderBy('service_date'));"
+          if oldready in s: s=s.replace(oldready,newready,1)
 
+          # ==================== FORMULÁRIO DO CLIENTE ====================
           p.write_text(s,encoding='utf-8')
-
-          # ---------- agendar4.html ----------
           p=Path('agendar4.html')
           s=p.read_text(encoding='utf-8')
-          imp_old="import{getFirestore,collection,query,where,getDocs,addDoc,doc,getDoc}from"
-          if imp_old not in s:
-              imp_old2="import{getFirestore,collection,query,where,getDocs,addDoc}from"
-              if imp_old2 not in s: raise SystemExit('Import do cliente não encontrado')
-              s=s.replace(imp_old2,"import{getFirestore,collection,query,where,getDocs,addDoc,doc,getDoc}from",1)
 
-          old_check="async function verificarAgendaAberta(){try{const x=await getDoc(doc(db,'config','agenda'));const aberta=!x.exists()||x.data().aberta!==false;if(!aberta){document.getElementById('agendaClosedOverlay').classList.add('active');document.querySelectorAll('button').forEach(b=>{if(b.id!=='new')b.disabled=true});}return aberta}catch(e){console.error(e);return true}}\nverificarAgendaAberta();"
-          new_check="window.diasFechados=[];async function verificarAgendaAberta(){try{const x=await getDoc(doc(db,'config','agenda'));const d=x.exists()?x.data():{};window.diasFechados=Array.isArray(d.diasFechados)?d.diasFechados:[];const aberta=d.aberta!==false;if(!aberta){document.getElementById('agendaClosedOverlay').classList.add('active');document.querySelectorAll('button').forEach(b=>{if(b.id!=='new')b.disabled=true})}return aberta}catch(e){console.error(e);return true}}\nverificarAgendaAberta();\nfunction dataEscolhida(){const s=JSON.stringify(chosen||'');const m=s.match(/\\d{4}-\\d{2}-\\d{2}/);return m?m[0]:''}\ndocument.addEventListener('click',function(e){if(e.target&&e.target.id==='cont'&&window.diasFechados.includes(dataEscolhida())){e.preventDefault();e.stopImmediatePropagation();error('A Seven não está aceitando novos agendamentos nesta data. Escolha outro dia.');}},true);"
-          if old_check in s: s=s.replace(old_check,new_check,1)
+          # Substitui a verificação antiga por uma que também lê diasFechados
+          oldcheck="async function verificarAgendaAberta(){try{const x=await getDoc(doc(db,'config','agenda'));const aberta=!x.exists()||x.data().aberta!==false;if(!aberta){document.getElementById('agendaClosedOverlay').classList.add('active');document.querySelectorAll('button').forEach(b=>{if(b.id!=='new')b.disabled=true});}return aberta}catch(e){console.error(e);return true}}\nverificarAgendaAberta();"
+          newcheck="""window.diasFechados=[];window.agendaAberta=true;async function verificarAgendaAberta(){try{const x=await getDoc(doc(db,'config','agenda'));const d=x.exists()?x.data():{};window.diasFechados=Array.isArray(d.diasFechados)?d.diasFechados:[];window.agendaAberta=d.aberta!==false;if(!window.agendaAberta){document.getElementById('agendaClosedOverlay').classList.add('active');document.querySelectorAll('button').forEach(b=>{if(b.id!=='new')b.disabled=true});}return window.agendaAberta}catch(e){console.error(e);return true}}
+verificarAgendaAberta();
+function dataSelecionada(){if(chosen&&chosen.date)return chosen.date;const el=document.querySelector('#days .day.selected');return el?.dataset?.date||''}
+function diaEstaFechado(d){return !!d&&window.diasFechados.includes(d)}
+"""
+          if oldcheck not in s: raise SystemExit('Não encontrei verificarAgendaAberta em agendar4.html')
+          s=s.replace(oldcheck,newcheck,1)
 
-          # Reforço: também bloqueia a confirmação final caso a data tenha sido fechada depois que o cliente abriu a página.
-          if 'dataEscolhida()' not in s:
-              raise SystemExit('Não foi possível instalar a validação de dias fechados')
+          # Intercepta o botão Continuar da etapa de horário. Assim o cliente não consegue avançar em dia fechado.
+          if 'diaEstaFechado(dataSelecionada())' not in s:
+              alvo="$('cont').onclick=()=>{"
+              if alvo not in s:
+                  raise SystemExit('Não encontrei o botão cont em agendar4.html')
+              s=s.replace(alvo,"$('cont').onclick=()=>{if(diaEstaFechado(dataSelecionada())){error('A Seven não está aceitando novos agendamentos nesta data. Escolha outro dia.');return;}",1)
 
           p.write_text(s,encoding='utf-8')
 
-      - name: Verificar alterações
+      - name: Validar arquivos
+        shell: python
         run: |
-          grep -q 'dataFecharAgenda' agendamento2.html
-          grep -q 'diasFechados' agendamento2.html
-          grep -q 'diasFechados' agendar4.html
-          grep -q 'dataEscolhida' agendar4.html
+          from pathlib import Path
+          a=Path('agendamento2.html').read_text(encoding='utf-8')
+          b=Path('agendar4.html').read_text(encoding='utf-8')
+          checks=[
+            ('agendamento2.html','diasFechadosPainel' in a),
+            ('agendamento2.html','adicionarDiaFechado' in a),
+            ('agendar4.html','diasFechados' in b),
+            ('agendar4.html','diaEstaFechado(dataSelecionada())' in b),
+          ]
+          for nome,ok in checks:
+            if not ok: raise SystemExit('Falha na validação: '+nome)
+          print('Controle por dias específicos instalado com sucesso.')
 
-      - name: Commit e publicação
+      - name: Publicar
         run: |
           git config user.name "Seven Agenda Bot"
           git config user.email "actions@users.noreply.github.com"
           git add agendamento2.html agendar4.html
-          if git diff --cached --quiet; then
-            echo "Os dois HTMLs já estão atualizados."
-          else
-            git commit -m "Adiciona fechamento de dias específicos"
-            git push
-          fi
+          if git diff --cached --quiet; then echo "Nenhuma alteração necessária."; else git commit -m "Ativa fechamento de dias específicos"; git push; fi
