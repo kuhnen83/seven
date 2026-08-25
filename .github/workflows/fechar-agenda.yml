@@ -16,9 +16,10 @@ jobs:
         run: python .github/scripts/update_agendar4.py
 
       - name: Compactar cards de servicos
-        shell: python
         run: |
+          python - <<'PY'
           from pathlib import Path
+          import re
           p=Path('agendar4.html')
           s=p.read_text(encoding='utf-8')
           css='''
@@ -34,25 +35,16 @@ jobs:
 .service-card:has(input:checked) .service-name{font-size:16px!important}
 .service-card:has(input:checked) .service-count{font-size:11px!important}
 .service-mobile-grid .variants,.service-mobile-grid .qty{margin:0 10px 10px!important}
-@media(min-width:701px){
-  .service-mobile-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important}
-  .service-mobile-grid .service-card>label{min-height:120px!important}
-}
-@media(max-width:420px){
-  .service-mobile-grid{gap:8px!important}
-  .service-mobile-grid .service-card>label{min-height:108px!important;padding:10px!important}
-  .service-icon{width:38px!important;height:38px!important;font-size:21px!important;margin-bottom:7px!important}
-  .service-name{font-size:15px!important}
-  .service-count{font-size:11px!important;padding-top:6px!important}
-}
+@media(min-width:701px){.service-mobile-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important}.service-mobile-grid .service-card>label{min-height:120px!important}}
+@media(max-width:420px){.service-mobile-grid{gap:8px!important}.service-mobile-grid .service-card>label{min-height:108px!important;padding:10px!important}.service-icon{width:38px!important;height:38px!important;font-size:21px!important;margin-bottom:7px!important}.service-name{font-size:15px!important}.service-count{font-size:11px!important;padding-top:6px!important}}
 '''
           marker='/* ===== Cards compactos Seven ===== */'
           if marker not in s:
               s=s.replace('</style>',css+'</style>',1)
           else:
-              import re
               s=re.sub(r'/\* ===== Cards compactos Seven ===== \*/.*?(?=</style>)',css.strip()+'\n',s,flags=re.S)
           p.write_text(s,encoding='utf-8')
+          PY
 
       - name: Validar JavaScript e cards
         run: |
@@ -64,7 +56,8 @@ jobs:
               if item not in s:
                   raise SystemExit('Faltando: '+item)
           m=re.search(r'<script type="module">(.*?)</script>',s,re.S)
-          if not m: raise SystemExit('Script principal nao encontrado')
+          if not m:
+              raise SystemExit('Script principal nao encontrado')
           Path('/tmp/check.mjs').write_text(m.group(1),encoding='utf-8')
           r=subprocess.run(['node','--check','/tmp/check.mjs'],capture_output=True,text=True)
           print(r.stderr)
