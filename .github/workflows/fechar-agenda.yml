@@ -24,19 +24,36 @@ jobs:
           s=p.read_text(encoding='utf-8')
           css='''
 /* ===== Cards compactos Seven ===== */
-.service-mobile-grid{gap:10px!important;margin:14px 0!important}
-.service-mobile-grid .service-card{border-radius:14px!important}
-.service-mobile-grid .service-card>label{min-height:118px!important;padding:12px!important}
-.service-icon{width:42px!important;height:42px!important;border-radius:11px!important;font-size:23px!important;margin-bottom:8px!important}
-.service-name{font-size:17px!important;line-height:1.05!important}
-.service-count{font-size:12px!important;padding-top:7px!important}
-.service-card:has(input:checked)>label{padding:11px 13px!important;grid-template-columns:48px 1fr!important}
-.service-card:has(input:checked) .service-icon{width:40px!important;height:40px!important}
-.service-card:has(input:checked) .service-name{font-size:16px!important}
-.service-card:has(input:checked) .service-count{font-size:11px!important}
-.service-mobile-grid .variants,.service-mobile-grid .qty{margin:0 10px 10px!important}
-@media(min-width:701px){.service-mobile-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important}.service-mobile-grid .service-card>label{min-height:120px!important}}
-@media(max-width:420px){.service-mobile-grid{gap:8px!important}.service-mobile-grid .service-card>label{min-height:108px!important;padding:10px!important}.service-icon{width:38px!important;height:38px!important;font-size:21px!important;margin-bottom:7px!important}.service-name{font-size:15px!important}.service-count{font-size:11px!important;padding-top:6px!important}}
+.service-mobile-grid{gap:8px!important;margin:12px 0 14px!important}
+.service-mobile-grid .service-card{border-radius:12px!important;box-shadow:0 4px 12px #0b17300b!important}
+.service-mobile-grid .service-card>label{min-height:96px!important;padding:9px 10px!important}
+.service-icon{width:34px!important;height:34px!important;border-radius:9px!important;font-size:19px!important;margin-bottom:6px!important}
+.service-name{font-size:15px!important;line-height:1!important}
+.service-count{font-size:10.5px!important;padding-top:5px!important}
+.service-card:has(input:checked)>label{padding:9px 10px!important;grid-template-columns:42px 1fr!important}
+.service-card:has(input:checked) .service-icon{width:34px!important;height:34px!important}
+.service-card:has(input:checked) .service-name{font-size:15px!important}
+.service-card:has(input:checked) .service-count{font-size:10.5px!important}
+.service-mobile-grid .variants,.service-mobile-grid .qty{margin:0 8px 8px!important}
+.service-mobile-grid .variant{padding:7px!important;margin:5px 0!important}
+@media(min-width:701px){
+  .service-mobile-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:10px!important}
+  .service-mobile-grid .service-card>label{min-height:102px!important}
+}
+@media(max-width:700px){
+  .service-mobile-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important}
+  .service-mobile-grid .service-card>label{min-height:92px!important;padding:8px 9px!important}
+  .service-icon{width:32px!important;height:32px!important;font-size:18px!important;margin-bottom:5px!important}
+  .service-name{font-size:14px!important}
+  .service-count{font-size:10px!important;padding-top:4px!important}
+}
+@media(max-width:380px){
+  .service-mobile-grid{gap:7px!important}
+  .service-mobile-grid .service-card>label{min-height:88px!important;padding:7px 8px!important}
+  .service-icon{width:30px!important;height:30px!important;font-size:17px!important}
+  .service-name{font-size:13.5px!important}
+  .service-count{font-size:9.5px!important}
+}
 '''
           marker='/* ===== Cards compactos Seven ===== */'
           if marker not in s:
@@ -72,6 +89,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "Pagina ja esta atualizada."
           else
-            git commit -m "Reduz tamanho dos cards de servicos"
+            git commit -m "Deixa cards de servicos mais compactos"
             git push
           fi
