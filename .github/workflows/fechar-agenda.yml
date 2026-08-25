@@ -1,4 +1,4 @@
-name: Atualizar serviços mobile Seven
+name: Atualizar serviços Seven
 on:
   push:
     branches: [main]
@@ -10,39 +10,66 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Transformar serviços em cards mobile
+      - name: Adicionar novos serviços ao agendar4
         shell: python
         run: |
           from pathlib import Path
           p=Path('agendar4.html')
           s=p.read_text(encoding='utf-8')
 
-          # Mantém os mesmos inputs/IDs para preservar toda a lógica existente.
-          old_sofa='<div class="service"><label><input type="checkbox" id="sofa"> 🛋️ Higienização de sofá</label><div id="svs" class="variants">'
-          new_sofa='<div class="service service-card"><label><input type="checkbox" id="sofa"><span class="service-icon">🛋️</span><span class="service-name">Sofás</span><span class="service-count">4 opções</span></label><div id="svs" class="variants">'
-          old_col='<div class="service"><label><input type="checkbox" id="col"> 🛏️ Higienização de colchão</label><div id="cvs" class="variants">'
-          new_col='<div class="service service-card"><label><input type="checkbox" id="col"><span class="service-icon">🛏️</span><span class="service-name">Colchões</span><span class="service-count">4 opções</span></label><div id="cvs" class="variants">'
-          old_pol='<div class="service"><label><input type="checkbox" id="pol"> 🪑 Higienização de poltrona</label><div id="polq" class="qty">'
-          new_pol='<div class="service service-card"><label><input type="checkbox" id="pol"><span class="service-icon">🪑</span><span class="service-name">Poltronas</span><span class="service-count">Por quantidade</span></label><div id="polq" class="qty">'
-          old_cad='<div class="service"><label><input type="checkbox" id="cad"> 🪑 Higienização de cadeiras</label><div id="cadq" class="qty">'
-          new_cad='<div class="service service-card"><label><input type="checkbox" id="cad"><span class="service-icon">🪑</span><span class="service-name">Cadeiras</span><span class="service-count">Por quantidade</span></label><div id="cadq" class="qty">'
+          # Garante que a grade de cards já existente continue intacta.
+          if 'service-mobile-grid' not in s:
+              raise SystemExit('A versão mobile com cards ainda não está presente em agendar4.html')
 
-          for old,new in [(old_sofa,new_sofa),(old_col,new_col),(old_pol,new_pol),(old_cad,new_cad)]:
-              if old in s:
-                  s=s.replace(old,new,1)
+          # Adiciona os novos cards antes do fechamento da grade de serviços.
+          if 'id="carro"' not in s:
+              marker='<div class="total"><strong>Total</strong><strong id="total">R$ 0,00</strong></div>'
+              if marker not in s: raise SystemExit('Total não encontrado')
+              novos='''
+<div class="service service-card"><label><input type="checkbox" id="carro"><span class="service-icon">🚗</span><span class="service-name">Carro</span><span class="service-count">4 opções</span></label><div id="carrov" class="variants">
+<label class="variant"><span><input type="radio" name="carv" value="209" data-name="Hatch - bancos e carpete" data-dur="120"> Hatch - bancos e carpete</span><b>R$ 209,00</b></label>
+<label class="variant"><span><input type="radio" name="carv" value="249" data-name="Sedan - bancos e carpete" data-dur="120"> Sedan - bancos e carpete</span><b>R$ 249,00</b></label>
+<label class="variant"><span><input type="radio" name="carv" value="289" data-name="SUV - bancos e carpete" data-dur="120"> SUV - bancos e carpete</span><b>R$ 289,00</b></label>
+<label class="variant variant-disabled"><span>🛻 Caminhonete - bancos e carpete</span><b>Valor a confirmar</b></label>
+</div></div>
+<div class="service service-card"><label><input type="checkbox" id="carpete"><span class="service-icon">🧹</span><span class="service-name">Carpete</span><span class="service-count">R$ 49/m²</span></label><div id="carpeteq" class="qty"><label for="qcarpete">Quantidade em m² (R$ 49,00/m²)</label><input id="qcarpete" type="number" min="1" max="100" step="0.5" value="1" inputmode="decimal"></div></div>
+<div class="service service-card"><label><input type="checkbox" id="cab"><span class="service-icon">🛏️</span><span class="service-name">Cabeceira</span><span class="service-count">1 opção</span></label><div id="cabv" class="variants">
+<label class="variant"><span><input type="radio" name="cabv" value="109" data-name="Cabeceira solteiro" data-dur="60"> Cabeceira solteiro</span><b>R$ 109,00</b></label>
+</div></div>
+'''
+              # A grade termina imediatamente antes do total: injeta antes do fechamento final da grid.
+              grid_end='</div>\n<div class="total"><strong>Total</strong><strong id="total">R$ 0,00</strong></div>'
+              if grid_end not in s: raise SystemExit('Fim da grade de serviços não encontrado')
+              s=s.replace(grid_end,novos+'</div>\n'+marker,1)
 
-          # Agrupa somente os serviços, sem tocar nos campos, total ou botões.
-          if 'class="service-mobile-grid"' not in s:
-              first='<div class="service service-card"><label><input type="checkbox" id="sofa">'
-              if first not in s: raise SystemExit('Card de sofá não encontrado')
-              s=s.replace(first,'<div class="service-mobile-grid">'+first,1)
-              end='<div id="cadq" class="qty"><label for="qcad">Quantidade (R$ 24,00 cada)</label><input id="qcad" type="number" min="1" max="50" value="1" inputmode="numeric"></div></div>\n<div class="total">'
-              if end not in s: raise SystemExit('Fim do bloco de cadeiras não encontrado')
-              s=s.replace(end,'<div id="cadq" class="qty"><label for="qcad">Quantidade (R$ 24,00 cada)</label><input id="qcad" type="number" min="1" max="50" value="1" inputmode="numeric"></div></div></div>\n<div class="total">',1)
+          # Ajustes visuais leves para opção sem preço definido.
+          if '.variant-disabled{' not in s:
+              s=s.replace('</style>','.variant-disabled{opacity:.7;background:#f3f5f7!important}.variant-disabled b{color:#7b8794;font-size:12px}</style>',1)
 
-          css='''.service-mobile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0}.service-mobile-grid .service-card{margin:0;padding:0;border:1px solid #dce6f1;border-radius:18px;background:#fff;overflow:hidden;box-shadow:0 8px 18px #0b17300d;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}.service-mobile-grid .service-card:hover{transform:translateY(-1px);border-color:#9bbff0;box-shadow:0 10px 22px #0b173016}.service-mobile-grid .service-card>label{display:flex!important;flex-direction:column!important;align-items:flex-start!important;justify-content:flex-start!important;min-height:150px!important;padding:16px!important;gap:0!important;cursor:pointer!important;color:#071b3a!important;position:relative!important;box-sizing:border-box!important}.service-mobile-grid .service-card>label input[type=checkbox]{position:absolute!important;opacity:0!important;pointer-events:none!important;width:1px!important;height:1px!important}.service-icon{width:50px;height:50px;border-radius:14px;background:#eef4ff;display:flex;align-items:center;justify-content:center;font-size:27px;margin-bottom:13px;box-shadow:inset 0 0 0 1px #e1eaff}.service-name{font-size:20px;font-weight:900;color:#071b3a;line-height:1.1}.service-count{font-size:14px;color:#70809a;margin-top:auto;padding-top:12px}.service-card:has(input:checked){grid-column:1/-1;border-color:#2d7eea;box-shadow:0 0 0 2px #2d7eea20,0 10px 24px #0b173016}.service-card:has(input:checked)>label{min-height:auto!important;display:grid!important;grid-template-columns:58px 1fr!important;grid-template-rows:auto auto!important;align-items:center!important;padding:14px 16px!important}.service-card:has(input:checked) .service-icon{grid-row:1/3;margin:0;width:48px;height:48px}.service-card:has(input:checked) .service-name{font-size:18px}.service-card:has(input:checked) .service-count{margin:2px 0 0;padding:0;font-size:13px}.service-mobile-grid .variants,.service-mobile-grid .qty{margin:0 14px 14px}.service-mobile-grid .variant{background:#f8fbff}.service-mobile-grid .qty{background:#f7fafc}@media(min-width:701px){.service-mobile-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.service-mobile-grid .service-card>label{min-height:145px}.service-card:has(input:checked){grid-column:span 2}}@media(max-width:420px){.service-mobile-grid{gap:10px}.service-mobile-grid .service-card>label{min-height:138px!important;padding:13px!important}.service-icon{width:46px;height:46px;font-size:24px;margin-bottom:11px}.service-name{font-size:17px}.service-count{font-size:12px}.service-card:has(input:checked)>label{min-height:auto!important}}'''
-          if '.service-mobile-grid{' not in s:
-              s=s.replace('</style>',css+'</style>',1)
+          # Inicialização dos blocos adicionais.
+          old="$('polq').style.display='none';$('cadq').style.display='none';"
+          new="$('polq').style.display='none';$('cadq').style.display='none';$('carrov').style.display='none';$('carpeteq').style.display='none';$('cabv').style.display='none';"
+          if old in s and "$('carrov').style.display='none'" not in s:
+              s=s.replace(old,new,1)
+
+          # Adiciona os novos serviços no cálculo sem alterar os existentes.
+          old_items="if($('cad').checked){const q=qty('qcad',1,50);a.push({name:'Cadeira',price:24*q,dur:60*q,quantity:q,unit_price:24})}return a}"
+          new_items="if($('cad').checked){const q=qty('qcad',1,50);a.push({name:'Cadeira',price:24*q,dur:60*q,quantity:q,unit_price:24})}if($('carro').checked){const x=document.querySelector('input[name=carv]:checked');if(!x)return null;a.push({name:x.dataset.name,price:+x.value,dur:+x.dataset.dur,quantity:1,unit_price:+x.value})}if($('carpete').checked){const q=Math.max(1,Math.min(100,parseFloat($('qcarpete').value)||1));$('qcarpete').value=q;a.push({name:'Carpete '+q.toLocaleString('pt-BR')+' m²',price:49*q,dur:Math.max(30,Math.ceil(q*30)),quantity:q,unit_price:49})}if($('cab').checked){const x=document.querySelector('input[name=cabv]:checked');if(!x)return null;a.push({name:x.dataset.name,price:+x.value,dur:+x.dataset.dur,quantity:1,unit_price:+x.value})}return a}"
+          if old_items in s and "$('carro').checked" not in s:
+              s=s.replace(old_items,new_items,1)
+
+          # Eventos de abrir/fechar cards e recalcular.
+          marker="$('sofa').onchange=()=>{"
+          if marker not in s: raise SystemExit('Eventos de serviço não encontrados')
+          if "$('carro').onchange=" not in s:
+              insert="""$('carro').onchange=()=>{$('carrov').style.display=$('carro').checked?'block':'none';if(!$('carro').checked)document.querySelectorAll('input[name=carv]').forEach(x=>x.checked=false);calc()};$('carpete').onchange=()=>{$('carpeteq').style.display=$('carpete').checked?'flex':'none';calc()};$('cab').onchange=()=>{$('cabv').style.display=$('cab').checked?'block':'none';if(!$('cab').checked)document.querySelectorAll('input[name=cabv]').forEach(x=>x.checked=false);calc()};$('qcarpete').oninput=calc;"""
+              s=s.replace(marker,insert+marker,1)
+
+          # Validação para exigir a opção de carro/cabeceira quando o card estiver marcado.
+          old_val="if(($('sofa').checked&&!document.querySelector('input[name=sv]:checked'))||($('col').checked&&!document.querySelector('input[name=cv]:checked'))){error('Selecione o tamanho do sofá ou colchão.');return}"
+          new_val="if(($('sofa').checked&&!document.querySelector('input[name=sv]:checked'))||($('col').checked&&!document.querySelector('input[name=cv]:checked'))||($('carro').checked&&!document.querySelector('input[name=carv]:checked'))||($('cab').checked&&!document.querySelector('input[name=cabv]:checked'))){error('Selecione a opção do serviço escolhido.');return}"
+          if old_val in s:
+              s=s.replace(old_val,new_val,1)
 
           p.write_text(s,encoding='utf-8')
 
@@ -52,7 +79,7 @@ jobs:
           from pathlib import Path
           import re,subprocess,sys
           s=Path('agendar4.html').read_text(encoding='utf-8')
-          for x in ['service-mobile-grid','service-card','service-icon','service-count','id="sofa"','id="col"','id="pol"','id="cad"',"$('sofa').onchange=","$('col').onchange=",'R$ 149,00','R$ 209,00','seven-fixed-menu']:
+          for x in ['id="carro"','id="carpete"','id="cab"','Hatch - bancos e carpete','R$ 209,00','R$ 249,00','R$ 289,00','R$ 49,00/m²','Cabeceira solteiro','R$ 109,00',"$('carro').onchange=","$('carpete').onchange=","$('cab').onchange=",'seven-fixed-menu','service-mobile-grid']:
               if x not in s: raise SystemExit('Elemento ausente: '+x)
           m=re.search(r'<script type="module">(.*?)</script>',s,flags=re.S)
           if not m: raise SystemExit('Script principal não encontrado')
@@ -60,7 +87,7 @@ jobs:
           r=subprocess.run(['node','--check','/tmp/check.mjs'],capture_output=True,text=True)
           print(r.stderr)
           if r.returncode: sys.exit(r.returncode)
-          print('OK: cards mobile adicionados sem alterar a lógica do agendamento.')
+          print('OK: carro, carpete e cabeceira adicionados sem quebrar o JavaScript.')
 
       - name: Publicar
         run: |
@@ -70,6 +97,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "Nenhuma alteração necessária."
           else
-            git commit -m "Transforma serviços em cards otimizados para celular"
+            git commit -m "Adiciona carro, carpete e cabeceira ao agendamento"
             git push
           fi
