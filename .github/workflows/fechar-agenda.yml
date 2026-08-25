@@ -10,66 +10,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Adicionar novos serviços ao agendar4
+      - name: Atualizar preços no agendar4
         shell: python
         run: |
           from pathlib import Path
           p=Path('agendar4.html')
           s=p.read_text(encoding='utf-8')
 
-          # Garante que a grade de cards já existente continue intacta.
-          if 'service-mobile-grid' not in s:
-              raise SystemExit('A versão mobile com cards ainda não está presente em agendar4.html')
+          # Caminhonete passa a ter o mesmo valor da SUV.
+          old_cam='<label class="variant variant-disabled"><span>🛻 Caminhonete - bancos e carpete</span><b>Valor a confirmar</b></label>'
+          new_cam='<label class="variant"><span><input type="radio" name="carv" value="289" data-name="Caminhonete - bancos e carpete" data-dur="120"> Caminhonete - bancos e carpete</span><b>R$ 289,00</b></label>'
+          if old_cam in s:
+              s=s.replace(old_cam,new_cam,1)
 
-          # Adiciona os novos cards antes do fechamento da grade de serviços.
-          if 'id="carro"' not in s:
-              marker='<div class="total"><strong>Total</strong><strong id="total">R$ 0,00</strong></div>'
-              if marker not in s: raise SystemExit('Total não encontrado')
-              novos='''
-<div class="service service-card"><label><input type="checkbox" id="carro"><span class="service-icon">🚗</span><span class="service-name">Carro</span><span class="service-count">4 opções</span></label><div id="carrov" class="variants">
-<label class="variant"><span><input type="radio" name="carv" value="209" data-name="Hatch - bancos e carpete" data-dur="120"> Hatch - bancos e carpete</span><b>R$ 209,00</b></label>
-<label class="variant"><span><input type="radio" name="carv" value="249" data-name="Sedan - bancos e carpete" data-dur="120"> Sedan - bancos e carpete</span><b>R$ 249,00</b></label>
-<label class="variant"><span><input type="radio" name="carv" value="289" data-name="SUV - bancos e carpete" data-dur="120"> SUV - bancos e carpete</span><b>R$ 289,00</b></label>
-<label class="variant variant-disabled"><span>🛻 Caminhonete - bancos e carpete</span><b>Valor a confirmar</b></label>
-</div></div>
-<div class="service service-card"><label><input type="checkbox" id="carpete"><span class="service-icon">🧹</span><span class="service-name">Carpete</span><span class="service-count">R$ 49/m²</span></label><div id="carpeteq" class="qty"><label for="qcarpete">Quantidade em m² (R$ 49,00/m²)</label><input id="qcarpete" type="number" min="1" max="100" step="0.5" value="1" inputmode="decimal"></div></div>
-<div class="service service-card"><label><input type="checkbox" id="cab"><span class="service-icon">🛏️</span><span class="service-name">Cabeceira</span><span class="service-count">1 opção</span></label><div id="cabv" class="variants">
-<label class="variant"><span><input type="radio" name="cabv" value="109" data-name="Cabeceira solteiro" data-dur="60"> Cabeceira solteiro</span><b>R$ 109,00</b></label>
-</div></div>
-'''
-              # A grade termina imediatamente antes do total: injeta antes do fechamento final da grid.
-              grid_end='</div>\n<div class="total"><strong>Total</strong><strong id="total">R$ 0,00</strong></div>'
-              if grid_end not in s: raise SystemExit('Fim da grade de serviços não encontrado')
-              s=s.replace(grid_end,novos+'</div>\n'+marker,1)
-
-          # Ajustes visuais leves para opção sem preço definido.
-          if '.variant-disabled{' not in s:
-              s=s.replace('</style>','.variant-disabled{opacity:.7;background:#f3f5f7!important}.variant-disabled b{color:#7b8794;font-size:12px}</style>',1)
-
-          # Inicialização dos blocos adicionais.
-          old="$('polq').style.display='none';$('cadq').style.display='none';"
-          new="$('polq').style.display='none';$('cadq').style.display='none';$('carrov').style.display='none';$('carpeteq').style.display='none';$('cabv').style.display='none';"
-          if old in s and "$('carrov').style.display='none'" not in s:
-              s=s.replace(old,new,1)
-
-          # Adiciona os novos serviços no cálculo sem alterar os existentes.
-          old_items="if($('cad').checked){const q=qty('qcad',1,50);a.push({name:'Cadeira',price:24*q,dur:60*q,quantity:q,unit_price:24})}return a}"
-          new_items="if($('cad').checked){const q=qty('qcad',1,50);a.push({name:'Cadeira',price:24*q,dur:60*q,quantity:q,unit_price:24})}if($('carro').checked){const x=document.querySelector('input[name=carv]:checked');if(!x)return null;a.push({name:x.dataset.name,price:+x.value,dur:+x.dataset.dur,quantity:1,unit_price:+x.value})}if($('carpete').checked){const q=Math.max(1,Math.min(100,parseFloat($('qcarpete').value)||1));$('qcarpete').value=q;a.push({name:'Carpete '+q.toLocaleString('pt-BR')+' m²',price:49*q,dur:Math.max(30,Math.ceil(q*30)),quantity:q,unit_price:49})}if($('cab').checked){const x=document.querySelector('input[name=cabv]:checked');if(!x)return null;a.push({name:x.dataset.name,price:+x.value,dur:+x.dataset.dur,quantity:1,unit_price:+x.value})}return a}"
-          if old_items in s and "$('carro').checked" not in s:
-              s=s.replace(old_items,new_items,1)
-
-          # Eventos de abrir/fechar cards e recalcular.
-          marker="$('sofa').onchange=()=>{"
-          if marker not in s: raise SystemExit('Eventos de serviço não encontrados')
-          if "$('carro').onchange=" not in s:
-              insert="""$('carro').onchange=()=>{$('carrov').style.display=$('carro').checked?'block':'none';if(!$('carro').checked)document.querySelectorAll('input[name=carv]').forEach(x=>x.checked=false);calc()};$('carpete').onchange=()=>{$('carpeteq').style.display=$('carpete').checked?'flex':'none';calc()};$('cab').onchange=()=>{$('cabv').style.display=$('cab').checked?'block':'none';if(!$('cab').checked)document.querySelectorAll('input[name=cabv]').forEach(x=>x.checked=false);calc()};$('qcarpete').oninput=calc;"""
-              s=s.replace(marker,insert+marker,1)
-
-          # Validação para exigir a opção de carro/cabeceira quando o card estiver marcado.
-          old_val="if(($('sofa').checked&&!document.querySelector('input[name=sv]:checked'))||($('col').checked&&!document.querySelector('input[name=cv]:checked'))){error('Selecione o tamanho do sofá ou colchão.');return}"
-          new_val="if(($('sofa').checked&&!document.querySelector('input[name=sv]:checked'))||($('col').checked&&!document.querySelector('input[name=cv]:checked'))||($('carro').checked&&!document.querySelector('input[name=carv]:checked'))||($('cab').checked&&!document.querySelector('input[name=cabv]:checked'))){error('Selecione a opção do serviço escolhido.');return}"
-          if old_val in s:
-              s=s.replace(old_val,new_val,1)
+          # Cabeceiras: completa as quatro opções e atualiza a contagem visual.
+          s=s.replace('<span class="service-name">Cabeceira</span><span class="service-count">1 opção</span>', '<span class="service-name">Cabeceira</span><span class="service-count">4 opções</span>',1)
+          old_cab='<label class="variant"><span><input type="radio" name="cabv" value="109" data-name="Cabeceira solteiro" data-dur="60"> Cabeceira solteiro</span><b>R$ 109,00</b></label>'
+          new_cab='''<label class="variant"><span><input type="radio" name="cabv" value="109" data-name="Cabeceira solteiro" data-dur="60"> Cabeceira solteiro</span><b>R$ 109,00</b></label>
+<label class="variant"><span><input type="radio" name="cabv" value="139" data-name="Cabeceira casal" data-dur="60"> Cabeceira casal</span><b>R$ 139,00</b></label>
+<label class="variant"><span><input type="radio" name="cabv" value="149" data-name="Cabeceira Queen" data-dur="60"> Cabeceira Queen</span><b>R$ 149,00</b></label>
+<label class="variant"><span><input type="radio" name="cabv" value="169" data-name="Cabeceira King" data-dur="60"> Cabeceira King</span><b>R$ 169,00</b></label>'''
+          if old_cab in s and 'Cabeceira casal' not in s:
+              s=s.replace(old_cab,new_cab,1)
 
           p.write_text(s,encoding='utf-8')
 
@@ -79,7 +41,12 @@ jobs:
           from pathlib import Path
           import re,subprocess,sys
           s=Path('agendar4.html').read_text(encoding='utf-8')
-          for x in ['id="carro"','id="carpete"','id="cab"','Hatch - bancos e carpete','R$ 209,00','R$ 249,00','R$ 289,00','R$ 49,00/m²','Cabeceira solteiro','R$ 109,00',"$('carro').onchange=","$('carpete').onchange=","$('cab').onchange=",'seven-fixed-menu','service-mobile-grid']:
+          for x in [
+            'Caminhonete - bancos e carpete','value="289" data-name="Caminhonete - bancos e carpete"',
+            'Cabeceira solteiro','R$ 109,00','Cabeceira casal','R$ 139,00',
+            'Cabeceira Queen','R$ 149,00','Cabeceira King','R$ 169,00','4 opções',
+            "$('carro').onchange=","$('cab').onchange=",'service-mobile-grid','seven-fixed-menu'
+          ]:
               if x not in s: raise SystemExit('Elemento ausente: '+x)
           m=re.search(r'<script type="module">(.*?)</script>',s,flags=re.S)
           if not m: raise SystemExit('Script principal não encontrado')
@@ -87,7 +54,7 @@ jobs:
           r=subprocess.run(['node','--check','/tmp/check.mjs'],capture_output=True,text=True)
           print(r.stderr)
           if r.returncode: sys.exit(r.returncode)
-          print('OK: carro, carpete e cabeceira adicionados sem quebrar o JavaScript.')
+          print('OK: preços de caminhonete e cabeceiras atualizados.')
 
       - name: Publicar
         run: |
@@ -97,6 +64,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "Nenhuma alteração necessária."
           else
-            git commit -m "Adiciona carro, carpete e cabeceira ao agendamento"
+            git commit -m "Atualiza preços de caminhonete e cabeceiras"
             git push
           fi
