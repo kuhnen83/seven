@@ -1,4 +1,4 @@
-name: Atualizar menu Seven
+name: Atualizar serviços mobile Seven
 on:
   push:
     branches: [main]
@@ -10,31 +10,49 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Aplicar barra fixa no topo
+      - name: Transformar serviços em cards mobile
         shell: python
         run: |
           from pathlib import Path
           p=Path('agendar4.html')
           s=p.read_text(encoding='utf-8')
 
-          # Mantém todo o restante da página intacto e altera apenas o cabeçalho.
-          old='<div class="wrap"><div class="card"><div class="top"><div class="brand-top"><img class="brand-logo" src="./seven-logo.png?v=3" alt="Seven Limpeza"><div class="brand-copy"><p>Higienização profissional de estofados</p></div></div></div><div class="content">'
-          new='<div class="seven-fixed-menu"><div class="seven-fixed-inner"><div class="seven-fixed-brand"><img class="seven-fixed-logo" src="./seven-logo.png?v=4" alt="Seven Limpeza"><div class="seven-fixed-text">Higienização profissional de estofados</div></div><a class="seven-menu-whatsapp" href="https://wa.me/5548996782471?text=Ol%C3%A1%2C%20vim%20pelo%20agendamento%20online%20da%20Seven%20e%20preciso%20de%20ajuda." target="_blank" rel="noopener"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M19.11 17.36c-.28-.14-1.66-.82-1.92-.91-.26-.1-.45-.14-.64.14-.19.28-.73.91-.9 1.1-.17.19-.33.21-.61.07-.28-.14-1.18-.43-2.25-1.39-.83-.74-1.39-1.65-1.55-1.93-.16-.28-.02-.43.12-.57.13-.13.28-.33.42-.49.14-.16.19-.28.28-.47.09-.19.05-.35-.02-.49-.07-.14-.64-1.54-.88-2.11-.23-.56-.47-.48-.64-.49h-.55c-.19 0-.49.07-.75.35-.26.28-.99.97-.99 2.36s1.02 2.74 1.16 2.93c.14.19 2 3.05 4.85 4.28.68.29 1.21.47 1.62.6.68.22 1.3.19 1.79.12.55-.08 1.66-.68 1.9-1.34.23-.66.23-1.23.16-1.34-.07-.12-.26-.19-.54-.33zM16.03 4.8A11.1 11.1 0 0 0 6.6 21.76L5.03 27.5l5.87-1.54a11.1 11.1 0 1 0 5.13-21.16zm0 20.18c-1.72 0-3.4-.46-4.86-1.33l-.35-.21-3.48.91.93-3.39-.23-.35a9.07 9.07 0 1 1 7.99 4.37z"/></svg><span>WhatsApp</span></a></div></div><div class="seven-menu-spacer"></div><div class="wrap"><div class="card"><div class="content">'
-          if old not in s:
-              raise SystemExit('Cabeçalho atual não encontrado; nenhuma alteração foi aplicada.')
-          s=s.replace(old,new,1)
+          # Mantém os mesmos inputs/IDs para preservar toda a lógica existente.
+          old_sofa='<div class="service"><label><input type="checkbox" id="sofa"> 🛋️ Higienização de sofá</label><div id="svs" class="variants">'
+          new_sofa='<div class="service service-card"><label><input type="checkbox" id="sofa"><span class="service-icon">🛋️</span><span class="service-name">Sofás</span><span class="service-count">4 opções</span></label><div id="svs" class="variants">'
+          old_col='<div class="service"><label><input type="checkbox" id="col"> 🛏️ Higienização de colchão</label><div id="cvs" class="variants">'
+          new_col='<div class="service service-card"><label><input type="checkbox" id="col"><span class="service-icon">🛏️</span><span class="service-name">Colchões</span><span class="service-count">4 opções</span></label><div id="cvs" class="variants">'
+          old_pol='<div class="service"><label><input type="checkbox" id="pol"> 🪑 Higienização de poltrona</label><div id="polq" class="qty">'
+          new_pol='<div class="service service-card"><label><input type="checkbox" id="pol"><span class="service-icon">🪑</span><span class="service-name">Poltronas</span><span class="service-count">Por quantidade</span></label><div id="polq" class="qty">'
+          old_cad='<div class="service"><label><input type="checkbox" id="cad"> 🪑 Higienização de cadeiras</label><div id="cadq" class="qty">'
+          new_cad='<div class="service service-card"><label><input type="checkbox" id="cad"><span class="service-icon">🪑</span><span class="service-name">Cadeiras</span><span class="service-count">Por quantidade</span></label><div id="cadq" class="qty">'
 
-          css='''.seven-fixed-menu{position:fixed;top:0;left:0;right:0;z-index:2600;background:#0b1730;border-bottom:1px solid rgba(255,255,255,.12);box-shadow:0 4px 18px #0003}.seven-fixed-inner{max-width:1180px;height:76px;margin:0 auto;padding:0 22px;display:flex;align-items:center;justify-content:space-between;gap:20px;box-sizing:border-box}.seven-fixed-brand{display:flex;align-items:center;gap:15px;min-width:0}.seven-fixed-logo{width:88px;height:58px;object-fit:contain;display:block;background:transparent}.seven-fixed-text{color:#fff;font-size:15px;font-weight:500;line-height:1.25;white-space:nowrap}.seven-menu-whatsapp{display:flex;align-items:center;gap:9px;background:#253149;color:#fff;text-decoration:none;border:1px solid rgba(255,255,255,.18);border-radius:24px;padding:10px 17px;font-weight:700;white-space:nowrap}.seven-menu-whatsapp svg{width:20px;height:20px;fill:#25D366}.seven-menu-whatsapp:hover{background:#2d3c58}.seven-menu-spacer{height:76px}@media(max-width:600px){.seven-fixed-inner{height:68px;padding:0 12px;gap:10px}.seven-fixed-logo{width:68px;height:46px}.seven-fixed-text{font-size:12px;white-space:normal;max-width:170px}.seven-menu-whatsapp{padding:9px 11px;border-radius:22px}.seven-menu-whatsapp span{display:none}.seven-menu-spacer{height:68px}}'''
-          s=s.replace('</style>',css+'</style>',1)
+          for old,new in [(old_sofa,new_sofa),(old_col,new_col),(old_pol,new_pol),(old_cad,new_cad)]:
+              if old in s:
+                  s=s.replace(old,new,1)
+
+          # Agrupa somente os serviços, sem tocar nos campos, total ou botões.
+          if 'class="service-mobile-grid"' not in s:
+              first='<div class="service service-card"><label><input type="checkbox" id="sofa">'
+              if first not in s: raise SystemExit('Card de sofá não encontrado')
+              s=s.replace(first,'<div class="service-mobile-grid">'+first,1)
+              end='<div id="cadq" class="qty"><label for="qcad">Quantidade (R$ 24,00 cada)</label><input id="qcad" type="number" min="1" max="50" value="1" inputmode="numeric"></div></div>\n<div class="total">'
+              if end not in s: raise SystemExit('Fim do bloco de cadeiras não encontrado')
+              s=s.replace(end,'<div id="cadq" class="qty"><label for="qcad">Quantidade (R$ 24,00 cada)</label><input id="qcad" type="number" min="1" max="50" value="1" inputmode="numeric"></div></div></div>\n<div class="total">',1)
+
+          css='''.service-mobile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0}.service-mobile-grid .service-card{margin:0;padding:0;border:1px solid #dce6f1;border-radius:18px;background:#fff;overflow:hidden;box-shadow:0 8px 18px #0b17300d;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}.service-mobile-grid .service-card:hover{transform:translateY(-1px);border-color:#9bbff0;box-shadow:0 10px 22px #0b173016}.service-mobile-grid .service-card>label{display:flex!important;flex-direction:column!important;align-items:flex-start!important;justify-content:flex-start!important;min-height:150px!important;padding:16px!important;gap:0!important;cursor:pointer!important;color:#071b3a!important;position:relative!important;box-sizing:border-box!important}.service-mobile-grid .service-card>label input[type=checkbox]{position:absolute!important;opacity:0!important;pointer-events:none!important;width:1px!important;height:1px!important}.service-icon{width:50px;height:50px;border-radius:14px;background:#eef4ff;display:flex;align-items:center;justify-content:center;font-size:27px;margin-bottom:13px;box-shadow:inset 0 0 0 1px #e1eaff}.service-name{font-size:20px;font-weight:900;color:#071b3a;line-height:1.1}.service-count{font-size:14px;color:#70809a;margin-top:auto;padding-top:12px}.service-card:has(input:checked){grid-column:1/-1;border-color:#2d7eea;box-shadow:0 0 0 2px #2d7eea20,0 10px 24px #0b173016}.service-card:has(input:checked)>label{min-height:auto!important;display:grid!important;grid-template-columns:58px 1fr!important;grid-template-rows:auto auto!important;align-items:center!important;padding:14px 16px!important}.service-card:has(input:checked) .service-icon{grid-row:1/3;margin:0;width:48px;height:48px}.service-card:has(input:checked) .service-name{font-size:18px}.service-card:has(input:checked) .service-count{margin:2px 0 0;padding:0;font-size:13px}.service-mobile-grid .variants,.service-mobile-grid .qty{margin:0 14px 14px}.service-mobile-grid .variant{background:#f8fbff}.service-mobile-grid .qty{background:#f7fafc}@media(min-width:701px){.service-mobile-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.service-mobile-grid .service-card>label{min-height:145px}.service-card:has(input:checked){grid-column:span 2}}@media(max-width:420px){.service-mobile-grid{gap:10px}.service-mobile-grid .service-card>label{min-height:138px!important;padding:13px!important}.service-icon{width:46px;height:46px;font-size:24px;margin-bottom:11px}.service-name{font-size:17px}.service-count{font-size:12px}.service-card:has(input:checked)>label{min-height:auto!important}}'''
+          if '.service-mobile-grid{' not in s:
+              s=s.replace('</style>',css+'</style>',1)
+
           p.write_text(s,encoding='utf-8')
 
-      - name: Validar página
+      - name: Validar página e JavaScript
         shell: python
         run: |
           from pathlib import Path
           import re,subprocess,sys
           s=Path('agendar4.html').read_text(encoding='utf-8')
-          for x in ['seven-fixed-menu','seven-fixed-logo','seven-menu-whatsapp','seven-logo.png?v=4',"$('sofa').onchange=","$('col').onchange=",'R$ 149,00','R$ 209,00']:
+          for x in ['service-mobile-grid','service-card','service-icon','service-count','id="sofa"','id="col"','id="pol"','id="cad"',"$('sofa').onchange=","$('col').onchange=",'R$ 149,00','R$ 209,00','seven-fixed-menu']:
               if x not in s: raise SystemExit('Elemento ausente: '+x)
           m=re.search(r'<script type="module">(.*?)</script>',s,flags=re.S)
           if not m: raise SystemExit('Script principal não encontrado')
@@ -42,6 +60,7 @@ jobs:
           r=subprocess.run(['node','--check','/tmp/check.mjs'],capture_output=True,text=True)
           print(r.stderr)
           if r.returncode: sys.exit(r.returncode)
+          print('OK: cards mobile adicionados sem alterar a lógica do agendamento.')
 
       - name: Publicar
         run: |
@@ -51,6 +70,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "Nenhuma alteração necessária."
           else
-            git commit -m "Adiciona barra fixa com logo e WhatsApp no agendamento"
+            git commit -m "Transforma serviços em cards otimizados para celular"
             git push
           fi
