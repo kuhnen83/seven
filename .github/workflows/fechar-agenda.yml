@@ -1,4 +1,4 @@
-name: Corrigir controles da agenda Seven
+name: Atualizar interface Seven
 on:
   push:
     branches: [main]
@@ -6,105 +6,46 @@ on:
 permissions:
   contents: write
 jobs:
-  corrigir:
+  atualizar:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Corrigir JavaScript das páginas
+      - name: Aplicar identidade visual no agendar4
         shell: python
         run: |
           from pathlib import Path
-
-          # ---------------- ADMIN ----------------
-          p=Path('agendamento2.html')
-          s=p.read_text(encoding='utf-8')
-          s=s.replace("onclick=\"removerDiaFechado(''+d+'')\"", "onclick=\"removerDiaFechado(\\''+d+'\\')\"")
-          s=s.replace("window.sevenAuthState(window.sevenAuth,user=>{const b=document.getElementById('btnFecharAgenda');if(b)b.title=user?'Administrador conectado':'Login necessário para alterar a agenda'});\n", "")
-          p.write_text(s,encoding='utf-8')
-
-          # ---------------- AGENDAMENTO PÚBLICO ----------------
           p=Path('agendar4.html')
           s=p.read_text(encoding='utf-8')
-
-          # Este caractere de escape inválido fazia o módulo inteiro falhar.
-          # Como consequência, os eventos de sofá/colchão não eram registrados
-          # e os preços/tamanhos não apareciam ao selecionar o serviço.
-          s=s.replace("\\$('days').appendChild(card);", "$('days').appendChild(card);")
-
+          css='''.brand-top{display:flex;align-items:center;gap:16px}.brand-logo{width:120px;height:auto;display:block;filter:drop-shadow(0 3px 7px #0003)}.brand-copy{min-width:0}.brand-copy strong{display:block;font-size:19px}.brand-copy p{margin:4px 0 0}.whatsapp-float{position:fixed;right:22px;bottom:22px;width:62px;height:62px;border-radius:50%;background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;text-decoration:none;box-shadow:0 8px 24px #0004;z-index:2500;transition:transform .2s ease,box-shadow .2s ease}.whatsapp-float:hover{transform:scale(1.06);box-shadow:0 10px 28px #0005}.whatsapp-float svg{width:34px;height:34px;fill:currentColor}@media(max-width:600px){.brand-logo{width:105px}.top{padding:18px}.brand-top{gap:12px}.brand-copy strong{font-size:16px}.brand-copy p{font-size:12px}.whatsapp-float{width:58px;height:58px;right:16px;bottom:16px}.whatsapp-float svg{width:32px;height:32px}}'''
+          if '.whatsapp-float{' not in s:
+              s=s.replace('</style>',css+'</style>',1)
+          old='<div class="wrap"><div class="card"><div class="top"><div class="logo">SEVEN</div><p>Higienização profissional de estofados</p></div><div class="content">'
+          new='<div class="wrap"><div class="card"><div class="top"><div class="brand-top"><img class="brand-logo" src="seven-logo.svg" alt="Seven Limpeza"><div class="brand-copy"><strong>Seven Limpeza</strong><p>Higienização profissional de estofados</p></div></div></div><div class="content">'
+          if old in s:
+              s=s.replace(old,new,1)
+          elif 'class="brand-logo"' not in s:
+              raise SystemExit('Cabeçalho atual não encontrado')
+          wa='''<a class="whatsapp-float" href="https://wa.me/5548996782471?text=Ol%C3%A1%2C%20vim%20pelo%20agendamento%20online%20da%20Seven%20e%20preciso%20de%20ajuda." target="_blank" rel="noopener" aria-label="Falar com a Seven pelo WhatsApp" title="Falar com a Seven pelo WhatsApp"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M19.11 17.36c-.28-.14-1.66-.82-1.92-.91-.26-.1-.45-.14-.64.14-.19.28-.73.91-.9 1.1-.17.19-.33.21-.61.07-.28-.14-1.18-.43-2.25-1.39-.83-.74-1.39-1.65-1.55-1.93-.16-.28-.02-.43.12-.57.13-.13.28-.33.42-.49.14-.16.19-.28.28-.47.09-.19.05-.35-.02-.49-.07-.14-.64-1.54-.88-2.11-.23-.56-.47-.48-.64-.49h-.55c-.19 0-.49.07-.75.35-.26.28-.99.97-.99 2.36s1.02 2.74 1.16 2.93c.14.19 2 3.05 4.85 4.28.68.29 1.21.47 1.62.6.68.22 1.3.19 1.79.12.55-.08 1.66-.68 1.9-1.34.23-.66.23-1.23.16-1.34-.07-.12-.26-.19-.54-.33zM16.03 4.8A11.1 11.1 0 0 0 6.6 21.76L5.03 27.5l5.87-1.54a11.1 11.1 0 1 0 5.13-21.16zm0 20.18c-1.72 0-3.4-.46-4.86-1.33l-.35-.21-3.48.91.93-3.39-.23-.35a9.07 9.07 0 1 1 7.99 4.37z"/></svg></a>'''
+          if 'class="whatsapp-float"' not in s:
+              s=s.replace('</body>',wa+'\n</body>',1)
           p.write_text(s,encoding='utf-8')
-
-      - name: Validar estrutura administrativa
+      - name: Validar agendar4
         shell: python
         run: |
           from pathlib import Path
-          s=Path('agendamento2.html').read_text(encoding='utf-8')
-          if "onclick=\"removerDiaFechado(''+d+'')\"" in s:
-              raise SystemExit('Erro de aspas ainda presente no admin')
-          for x in [
-            'window.alternarAgenda=async function',
-            'window.adicionarDiaFechado=async function',
-            'window.renderDiasFechados=function',
-            'id="btnFecharAgenda"',
-            'id="dataFecharAgenda"',
-            'firebase-auth.js'
-          ]:
-              if x not in s:
-                  raise SystemExit('Elemento ausente no admin: '+x)
-
-      - name: Validar estrutura do agendamento público
-        shell: python
-        run: |
-          from pathlib import Path
+          import re,subprocess,sys
           s=Path('agendar4.html').read_text(encoding='utf-8')
-          if "\\$('days').appendChild(card);" in s:
-              raise SystemExit('Escape inválido ainda presente em agendar4.html')
-          for x in [
-            "$('sofa').onchange=",
-            "$('col').onchange=",
-            "id=\"svs\" class=\"variants\"",
-            "id=\"cvs\" class=\"variants\"",
-            'R$ 149,00',
-            'R$ 209,00'
-          ]:
-              if x not in s:
-                  raise SystemExit('Elemento ausente no agendamento público: '+x)
-
-      - name: Validar sintaxe JavaScript do admin
-        shell: python
-        run: |
-          from pathlib import Path
-          import re, subprocess, sys
-          html=Path('agendamento2.html').read_text(encoding='utf-8')
-          scripts=re.findall(r'<script(?![^>]*type="module")[^>]*>(.*?)</script>', html, flags=re.S)
-          js=max(scripts,key=len)
-          Path('/tmp/agenda-check.js').write_text(js,encoding='utf-8')
-          r=subprocess.run(['node','--check','/tmp/agenda-check.js'],capture_output=True,text=True)
-          print(r.stdout); print(r.stderr)
-          if r.returncode!=0: sys.exit(r.returncode)
-
-      - name: Validar sintaxe JavaScript do agendamento público
-        shell: python
-        run: |
-          from pathlib import Path
-          import re, subprocess, sys
-          html=Path('agendar4.html').read_text(encoding='utf-8')
-          m=re.search(r'<script type="module">(.*?)</script>',html,flags=re.S)
-          if not m:
-              raise SystemExit('Script module não encontrado em agendar4.html')
+          for x in ['class="brand-logo"','seven-logo.svg','class="whatsapp-float"','wa.me/5548996782471',"$('sofa').onchange=","$('col').onchange=",'R$ 149,00','R$ 209,00']:
+              if x not in s: raise SystemExit('Elemento ausente: '+x)
+          m=re.search(r'<script type="module">(.*?)</script>',s,flags=re.S)
+          if not m: raise SystemExit('Script module não encontrado')
           Path('/tmp/agendar4-check.mjs').write_text(m.group(1),encoding='utf-8')
           r=subprocess.run(['node','--check','/tmp/agendar4-check.mjs'],capture_output=True,text=True)
-          print(r.stdout); print(r.stderr)
-          if r.returncode!=0: sys.exit(r.returncode)
-
+          print(r.stdout);print(r.stderr)
+          if r.returncode: sys.exit(r.returncode)
       - name: Publicar
         run: |
           git config user.name "Seven Agenda Bot"
           git config user.email "actions@users.noreply.github.com"
-          git add agendamento2.html agendar4.html
-          if git diff --cached --quiet; then
-            echo "Nenhuma alteração necessária."
-          else
-            git commit -m "Corrige seleção de serviços e controles da agenda"
-            git push
-          fi
+          git add agendar4.html
+          if git diff --cached --quiet; then echo "Nenhuma alteração necessária."; else git commit -m "Adiciona logo e WhatsApp flutuante ao agendamento"; git push; fi
