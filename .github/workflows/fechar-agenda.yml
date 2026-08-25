@@ -11,14 +11,58 @@ jobs:
     if: github.actor != 'github-actions[bot]'
     steps:
       - uses: actions/checkout@v4
-      - name: Aplicar atualizacoes
+
+      - name: Aplicar atualizacoes existentes
         run: python .github/scripts/update_agendar4.py
-      - name: Validar JavaScript
+
+      - name: Compactar cards de servicos
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('agendar4.html')
+          s=p.read_text(encoding='utf-8')
+          css='''
+/* ===== Cards compactos Seven ===== */
+.service-mobile-grid{gap:10px!important;margin:14px 0!important}
+.service-mobile-grid .service-card{border-radius:14px!important}
+.service-mobile-grid .service-card>label{min-height:118px!important;padding:12px!important}
+.service-icon{width:42px!important;height:42px!important;border-radius:11px!important;font-size:23px!important;margin-bottom:8px!important}
+.service-name{font-size:17px!important;line-height:1.05!important}
+.service-count{font-size:12px!important;padding-top:7px!important}
+.service-card:has(input:checked)>label{padding:11px 13px!important;grid-template-columns:48px 1fr!important}
+.service-card:has(input:checked) .service-icon{width:40px!important;height:40px!important}
+.service-card:has(input:checked) .service-name{font-size:16px!important}
+.service-card:has(input:checked) .service-count{font-size:11px!important}
+.service-mobile-grid .variants,.service-mobile-grid .qty{margin:0 10px 10px!important}
+@media(min-width:701px){
+  .service-mobile-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important}
+  .service-mobile-grid .service-card>label{min-height:120px!important}
+}
+@media(max-width:420px){
+  .service-mobile-grid{gap:8px!important}
+  .service-mobile-grid .service-card>label{min-height:108px!important;padding:10px!important}
+  .service-icon{width:38px!important;height:38px!important;font-size:21px!important;margin-bottom:7px!important}
+  .service-name{font-size:15px!important}
+  .service-count{font-size:11px!important;padding-top:6px!important}
+}
+'''
+          marker='/* ===== Cards compactos Seven ===== */'
+          if marker not in s:
+              s=s.replace('</style>',css+'</style>',1)
+          else:
+              import re
+              s=re.sub(r'/\* ===== Cards compactos Seven ===== \*/.*?(?=</style>)',css.strip()+'\n',s,flags=re.S)
+          p.write_text(s,encoding='utf-8')
+
+      - name: Validar JavaScript e cards
         run: |
           python - <<'PY'
           from pathlib import Path
           import re, subprocess, sys
           s=Path('agendar4.html').read_text(encoding='utf-8')
+          for item in ['id="sofa"','id="col"','id="pol"','id="cad"','id="carro"','id="carpete"','id="cab"','Cards compactos Seven']:
+              if item not in s:
+                  raise SystemExit('Faltando: '+item)
           m=re.search(r'<script type="module">(.*?)</script>',s,re.S)
           if not m: raise SystemExit('Script principal nao encontrado')
           Path('/tmp/check.mjs').write_text(m.group(1),encoding='utf-8')
@@ -26,6 +70,7 @@ jobs:
           print(r.stderr)
           sys.exit(r.returncode)
           PY
+
       - name: Publicar
         run: |
           git config user.name "Seven Agenda Bot"
@@ -34,6 +79,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "Pagina ja esta atualizada."
           else
-            git commit -m "Atualiza cards e servicos do agendamento"
+            git commit -m "Reduz tamanho dos cards de servicos"
             git push
           fi
