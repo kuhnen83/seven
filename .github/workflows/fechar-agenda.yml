@@ -1,4 +1,4 @@
-name: Atualizar interface Seven
+name: Atualizar logo Seven
 on:
   push:
     branches: [main]
@@ -10,47 +10,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Aplicar visual aprovado no agendar4
+      - name: Aplicar logo PNG oficial
         shell: python
         run: |
           from pathlib import Path
           p=Path('agendar4.html')
           s=p.read_text(encoding='utf-8')
-
-          # Header: logo maior, sem texto duplicado "Seven Limpeza", mantendo somente o slogan.
-          s=s.replace('<div class="brand-copy"><strong>Seven Limpeza</strong><p>Higienização profissional de estofados</p></div>', '<div class="brand-copy"><p>Higienização profissional de estofados</p></div>')
-
-          # Estilo do cabeçalho e cards inspirado na referência aprovada.
-          extra='''
-body{background:#f3f6fa}.wrap{max-width:920px;padding:0 14px 28px}.card{border-radius:0 0 18px 18px;box-shadow:0 10px 32px #00000014}.top{position:relative;overflow:hidden;background:linear-gradient(135deg,#0b3f78 0%,#0f5ba6 55%,#062f61 100%);padding:28px 34px}.top:after{content:"";position:absolute;right:-90px;top:-55px;width:390px;height:170px;border-radius:50%;border:34px solid rgba(35,132,245,.25);transform:rotate(-12deg)}.brand-top{position:relative;z-index:1;gap:28px}.brand-logo{width:210px;max-height:120px;object-fit:contain;filter:drop-shadow(0 5px 10px #0005)}.brand-copy{display:flex;align-items:center}.brand-copy p{font-size:25px;line-height:1.2;margin:0;color:#fff;font-weight:500}.content{padding:34px 38px}.step h1{font-size:40px;line-height:1.08;margin:8px 0 12px;color:#071b3a}.step>p{font-size:18px;color:#64748b;margin-bottom:28px}.service{border:1px solid #d7e2ee;border-radius:14px;padding:0;margin:14px 0;background:#fff;transition:.18s ease;box-shadow:0 1px 0 #fff inset}.service:hover{border-color:#9fc3ee;box-shadow:0 8px 18px #0f4c8110}.service>label{display:flex;align-items:center;min-height:88px;padding:0 20px;font-size:18px;color:#0d63c9;cursor:pointer;gap:12px}.service>label input[type=checkbox]{order:2;margin-left:auto;width:24px;height:24px;accent-color:#1976d2}.variants,.qty{margin:0 18px 16px}.variant{background:#f8fbff}.total{margin-top:22px}.whatsapp-float{right:26px;bottom:26px;width:72px;height:72px;box-shadow:0 12px 26px #0004}.whatsapp-float svg{width:39px;height:39px}@media(max-width:700px){.wrap{padding:0}.card{border-radius:0}.top{padding:18px 20px}.brand-top{gap:16px}.brand-logo{width:150px;max-height:92px}.brand-copy p{font-size:18px}.content{padding:26px 20px}.step h1{font-size:34px}.step>p{font-size:16px}.service>label{min-height:76px;font-size:16px;padding:0 16px}.whatsapp-float{width:62px;height:62px;right:16px;bottom:16px}.whatsapp-float svg{width:34px;height:34px}}
-'''
-          if 'body{background:#f3f6fa}' not in s:
+          # Troca qualquer referência antiga pela nova logo PNG enviada ao repositório.
+          s=s.replace('src="seven-logo.svg"','src="./seven-logo.png?v=3"')
+          s=s.replace('src="./seven-logo.svg?v=2"','src="./seven-logo.png?v=3"')
+          s=s.replace('<div class="brand-copy"><strong>Seven Limpeza</strong><p>Higienização profissional de estofados</p></div>','<div class="brand-copy"><p>Higienização profissional de estofados</p></div>')
+          # Ajuste de tamanho para preservar a proporção da logo horizontal.
+          extra='''.brand-logo{width:220px!important;height:auto!important;max-height:125px!important;object-fit:contain!important;background:transparent!important}.brand-copy p{margin:0;color:#fff}@media(max-width:600px){.brand-logo{width:155px!important;max-height:90px!important}}'''
+          if 'width:220px!important' not in s:
               s=s.replace('</style>',extra+'</style>',1)
-
-          # Garante que a logo use o arquivo transparente do repositório.
-          s=s.replace('src="seven-logo.svg"','src="./seven-logo.svg?v=2"')
-
           p.write_text(s,encoding='utf-8')
-
-      - name: Validar agendar4
+      - name: Validar antes de publicar
         shell: python
         run: |
           from pathlib import Path
           import re,subprocess,sys
           s=Path('agendar4.html').read_text(encoding='utf-8')
-          for x in ['seven-logo.svg?v=2','Higienização profissional de estofados','class="whatsapp-float"',"$('sofa').onchange=","$('col').onchange=",'R$ 149,00','R$ 209,00']:
+          for x in ['seven-logo.png?v=3','Higienização profissional de estofados',"$('sofa').onchange=","$('col').onchange=",'R$ 149,00','R$ 209,00']:
               if x not in s: raise SystemExit('Elemento ausente: '+x)
-          if '<strong>Seven Limpeza</strong>' in s: raise SystemExit('Texto duplicado Seven Limpeza ainda presente')
+          if '<strong>Seven Limpeza</strong>' in s: raise SystemExit('Texto Seven Limpeza duplicado ainda presente')
           m=re.search(r'<script type="module">(.*?)</script>',s,flags=re.S)
-          if not m: raise SystemExit('Script module não encontrado')
-          Path('/tmp/agendar4-check.mjs').write_text(m.group(1),encoding='utf-8')
-          r=subprocess.run(['node','--check','/tmp/agendar4-check.mjs'],capture_output=True,text=True)
-          print(r.stdout);print(r.stderr)
+          if not m: raise SystemExit('Script principal não encontrado')
+          Path('/tmp/check.mjs').write_text(m.group(1),encoding='utf-8')
+          r=subprocess.run(['node','--check','/tmp/check.mjs'],capture_output=True,text=True)
+          print(r.stderr)
           if r.returncode: sys.exit(r.returncode)
-
       - name: Publicar
         run: |
           git config user.name "Seven Agenda Bot"
           git config user.email "actions@users.noreply.github.com"
           git add agendar4.html
-          if git diff --cached --quiet; then echo "Nenhuma alteração necessária."; else git commit -m "Ajusta visual do agendamento para referência aprovada"; git push; fi
+          if git diff --cached --quiet; then
+            echo "Página já está usando a logo correta."
+          else
+            git commit -m "Usa logo PNG oficial da Seven no agendamento"
+            git push
+          fi
