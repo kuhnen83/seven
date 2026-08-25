@@ -20,6 +20,61 @@ jobs:
       - name: Atualizar agendar4
         run: python .github/scripts/update_agendar4.py
 
+      - name: Adicionar card Impermeabilizacao
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('agendar4.html')
+          s=p.read_text(encoding='utf-8')
+
+          if 'id="imp"' not in s:
+              carpet='<div class="service service-card"><label><input type="checkbox" id="carpete">'
+              if carpet not in s:
+                  raise SystemExit('Card Carpete nao encontrado')
+              card='''<div class="service service-card"><label><input type="checkbox" id="imp"><span class="service-icon">🛡️</span><span class="service-name">Impermeabilização</span><span class="service-count">4 opções</span></label><div id="impv" class="variants">
+<label class="variant"><span><input type="radio" name="impv" value="298" data-name="Impermeabilização sofá até 1,80 m" data-dur="120"> Sofá até 1,80 m</span><b>R$ 298,00</b></label>
+<label class="variant"><span><input type="radio" name="impv" value="338" data-name="Impermeabilização sofá até 2,30 m" data-dur="120"> Sofá até 2,30 m</span><b>R$ 338,00</b></label>
+<label class="variant"><span><input type="radio" name="impv" value="378" data-name="Impermeabilização sofá até 2,65 m" data-dur="120"> Sofá até 2,65 m</span><b>R$ 378,00</b></label>
+<label class="variant"><span><input type="radio" name="impv" value="418" data-name="Impermeabilização sofá até 3,00 m" data-dur="120"> Sofá até 3,00 m</span><b>R$ 418,00</b></label>
+</div></div>
+'''
+              s=s.replace(carpet,card+carpet,1)
+
+          # Inclui impermeabilizacao no cálculo.
+          if "$('imp').checked" not in s:
+              pattern=r"(function items\(\)\{.*?)(return a\})"
+              m=re.search(pattern,s,re.S)
+              if not m:
+                  raise SystemExit('Funcao items() nao encontrada')
+              add="if($('imp').checked){const x=document.querySelector('input[name=impv]:checked');if(!x)return null;a.push({name:x.dataset.name,price:+x.value,dur:+x.dataset.dur,quantity:1,unit_price:+x.value})}"
+              s=s[:m.start(2)]+add+s[m.start(2):]
+
+          # Inicializa o bloco fechado.
+          if "$('impv').style.display='none'" not in s:
+              marker="$('cabv').style.display='none';"
+              if marker not in s:
+                  raise SystemExit('Inicializacao dos servicos nao encontrada')
+              s=s.replace(marker,marker+"$('impv').style.display='none';",1)
+
+          # Abre e fecha o card e recalcula o total.
+          if "$('imp').onchange=" not in s:
+              marker="$('sofa').onchange=()=>{"
+              if marker not in s:
+                  raise SystemExit('Eventos dos servicos nao encontrados')
+              event="$('imp').onchange=()=>{$('impv').style.display=$('imp').checked?'block':'none';if(!$('imp').checked)document.querySelectorAll('input[name=impv]').forEach(x=>x.checked=false);calc()};"
+              s=s.replace(marker,event+marker,1)
+
+          # Valida escolha do tamanho antes de avancar.
+          if "$('imp').checked&&!document.querySelector('input[name=impv]:checked')" not in s:
+              old="($('cab').checked&&!document.querySelector('input[name=cabv]:checked'))"
+              new=old+"||($('imp').checked&&!document.querySelector('input[name=impv]:checked'))"
+              if old in s:
+                  s=s.replace(old,new,1)
+
+          p.write_text(s,encoding='utf-8')
+          PY
+
       - name: Deixar card Carpete horizontal
         run: |
           python - <<'PY'
@@ -51,7 +106,9 @@ jobs:
           import re, subprocess, sys
           s = Path('agendar4.html').read_text(encoding='utf-8')
           required = [
-              'id="sofa"','id="col"','id="pol"','id="cad"','id="carro"','id="carpete"','id="cab"',
+              'id="sofa"','id="col"','id="pol"','id="cad"','id="carro"','id="carpete"','id="cab"','id="imp"',
+              'R$ 298,00','R$ 338,00','R$ 378,00','R$ 418,00',
+              "$('imp').onchange=", "$('imp').checked",
               'Escolha o item abaixo, veja o preço e agende em 2 minutos.',
               'Pague só no dia','Seguro para pets e crianças','Cards compactos Seven',
               'Carpete horizontal largura dupla'
@@ -76,6 +133,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "Pagina ja esta atualizada."
           else
-            git commit -m "Deixa card Carpete horizontal e em largura dupla"
+            git commit -m "Adiciona card de impermeabilizacao"
             git push
           fi
