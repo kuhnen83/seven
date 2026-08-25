@@ -1,4 +1,4 @@
-name: Atualizar logo Seven
+name: Atualizar menu Seven
 on:
   push:
     branches: [main]
@@ -10,44 +10,47 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Aplicar logo PNG oficial
+      - name: Aplicar barra fixa no topo
         shell: python
         run: |
           from pathlib import Path
           p=Path('agendar4.html')
           s=p.read_text(encoding='utf-8')
-          # Troca qualquer referência antiga pela nova logo PNG enviada ao repositório.
-          s=s.replace('src="seven-logo.svg"','src="./seven-logo.png?v=3"')
-          s=s.replace('src="./seven-logo.svg?v=2"','src="./seven-logo.png?v=3"')
-          s=s.replace('<div class="brand-copy"><strong>Seven Limpeza</strong><p>Higienização profissional de estofados</p></div>','<div class="brand-copy"><p>Higienização profissional de estofados</p></div>')
-          # Ajuste de tamanho para preservar a proporção da logo horizontal.
-          extra='''.brand-logo{width:220px!important;height:auto!important;max-height:125px!important;object-fit:contain!important;background:transparent!important}.brand-copy p{margin:0;color:#fff}@media(max-width:600px){.brand-logo{width:155px!important;max-height:90px!important}}'''
-          if 'width:220px!important' not in s:
-              s=s.replace('</style>',extra+'</style>',1)
+
+          # Mantém todo o restante da página intacto e altera apenas o cabeçalho.
+          old='<div class="wrap"><div class="card"><div class="top"><div class="brand-top"><img class="brand-logo" src="./seven-logo.png?v=3" alt="Seven Limpeza"><div class="brand-copy"><p>Higienização profissional de estofados</p></div></div></div><div class="content">'
+          new='<div class="seven-fixed-menu"><div class="seven-fixed-inner"><div class="seven-fixed-brand"><img class="seven-fixed-logo" src="./seven-logo.png?v=4" alt="Seven Limpeza"><div class="seven-fixed-text">Higienização profissional de estofados</div></div><a class="seven-menu-whatsapp" href="https://wa.me/5548996782471?text=Ol%C3%A1%2C%20vim%20pelo%20agendamento%20online%20da%20Seven%20e%20preciso%20de%20ajuda." target="_blank" rel="noopener"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M19.11 17.36c-.28-.14-1.66-.82-1.92-.91-.26-.1-.45-.14-.64.14-.19.28-.73.91-.9 1.1-.17.19-.33.21-.61.07-.28-.14-1.18-.43-2.25-1.39-.83-.74-1.39-1.65-1.55-1.93-.16-.28-.02-.43.12-.57.13-.13.28-.33.42-.49.14-.16.19-.28.28-.47.09-.19.05-.35-.02-.49-.07-.14-.64-1.54-.88-2.11-.23-.56-.47-.48-.64-.49h-.55c-.19 0-.49.07-.75.35-.26.28-.99.97-.99 2.36s1.02 2.74 1.16 2.93c.14.19 2 3.05 4.85 4.28.68.29 1.21.47 1.62.6.68.22 1.3.19 1.79.12.55-.08 1.66-.68 1.9-1.34.23-.66.23-1.23.16-1.34-.07-.12-.26-.19-.54-.33zM16.03 4.8A11.1 11.1 0 0 0 6.6 21.76L5.03 27.5l5.87-1.54a11.1 11.1 0 1 0 5.13-21.16zm0 20.18c-1.72 0-3.4-.46-4.86-1.33l-.35-.21-3.48.91.93-3.39-.23-.35a9.07 9.07 0 1 1 7.99 4.37z"/></svg><span>WhatsApp</span></a></div></div><div class="seven-menu-spacer"></div><div class="wrap"><div class="card"><div class="content">'
+          if old not in s:
+              raise SystemExit('Cabeçalho atual não encontrado; nenhuma alteração foi aplicada.')
+          s=s.replace(old,new,1)
+
+          css='''.seven-fixed-menu{position:fixed;top:0;left:0;right:0;z-index:2600;background:#0b1730;border-bottom:1px solid rgba(255,255,255,.12);box-shadow:0 4px 18px #0003}.seven-fixed-inner{max-width:1180px;height:76px;margin:0 auto;padding:0 22px;display:flex;align-items:center;justify-content:space-between;gap:20px;box-sizing:border-box}.seven-fixed-brand{display:flex;align-items:center;gap:15px;min-width:0}.seven-fixed-logo{width:88px;height:58px;object-fit:contain;display:block;background:transparent}.seven-fixed-text{color:#fff;font-size:15px;font-weight:500;line-height:1.25;white-space:nowrap}.seven-menu-whatsapp{display:flex;align-items:center;gap:9px;background:#253149;color:#fff;text-decoration:none;border:1px solid rgba(255,255,255,.18);border-radius:24px;padding:10px 17px;font-weight:700;white-space:nowrap}.seven-menu-whatsapp svg{width:20px;height:20px;fill:#25D366}.seven-menu-whatsapp:hover{background:#2d3c58}.seven-menu-spacer{height:76px}@media(max-width:600px){.seven-fixed-inner{height:68px;padding:0 12px;gap:10px}.seven-fixed-logo{width:68px;height:46px}.seven-fixed-text{font-size:12px;white-space:normal;max-width:170px}.seven-menu-whatsapp{padding:9px 11px;border-radius:22px}.seven-menu-whatsapp span{display:none}.seven-menu-spacer{height:68px}}'''
+          s=s.replace('</style>',css+'</style>',1)
           p.write_text(s,encoding='utf-8')
-      - name: Validar antes de publicar
+
+      - name: Validar página
         shell: python
         run: |
           from pathlib import Path
           import re,subprocess,sys
           s=Path('agendar4.html').read_text(encoding='utf-8')
-          for x in ['seven-logo.png?v=3','Higienização profissional de estofados',"$('sofa').onchange=","$('col').onchange=",'R$ 149,00','R$ 209,00']:
+          for x in ['seven-fixed-menu','seven-fixed-logo','seven-menu-whatsapp','seven-logo.png?v=4',"$('sofa').onchange=","$('col').onchange=",'R$ 149,00','R$ 209,00']:
               if x not in s: raise SystemExit('Elemento ausente: '+x)
-          if '<strong>Seven Limpeza</strong>' in s: raise SystemExit('Texto Seven Limpeza duplicado ainda presente')
           m=re.search(r'<script type="module">(.*?)</script>',s,flags=re.S)
           if not m: raise SystemExit('Script principal não encontrado')
           Path('/tmp/check.mjs').write_text(m.group(1),encoding='utf-8')
           r=subprocess.run(['node','--check','/tmp/check.mjs'],capture_output=True,text=True)
           print(r.stderr)
           if r.returncode: sys.exit(r.returncode)
+
       - name: Publicar
         run: |
           git config user.name "Seven Agenda Bot"
           git config user.email "actions@users.noreply.github.com"
           git add agendar4.html
           if git diff --cached --quiet; then
-            echo "Página já está usando a logo correta."
+            echo "Nenhuma alteração necessária."
           else
-            git commit -m "Usa logo PNG oficial da Seven no agendamento"
+            git commit -m "Adiciona barra fixa com logo e WhatsApp no agendamento"
             git push
           fi
