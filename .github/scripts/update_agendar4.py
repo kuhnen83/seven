@@ -4,7 +4,16 @@ import re
 p = Path('agendar4.html')
 s = p.read_text(encoding='utf-8')
 
-# Mantém todo o conteúdo já gerado e aplica apenas o layout solicitado.
+# Corrige a estrutura HTML: o grid de serviços precisa terminar antes do Total.
+# Sem esse fechamento, Total/Nome/WhatsApp/Observação viravam itens do próprio grid.
+pattern = r'(<div id="carpeteq" class="qty carpete-box">.*?</div>\s*</div>)\s*(<div class="total"><strong>Total</strong><strong id="total">R\$ 0,00</strong></div>)'
+m = re.search(pattern, s, flags=re.S)
+if m:
+    trecho = m.group(0)
+    # Se ainda não houver um fechamento extra do service-mobile-grid, adiciona.
+    corrigido = m.group(1) + '\n</div>\n' + m.group(2)
+    s = s.replace(trecho, corrigido, 1)
+
 layout_css = '''
 /* ===== Layout dados do cliente Seven ===== */
 #s1.active{display:block!important}
@@ -22,11 +31,15 @@ if marker not in s:
 else:
     s=re.sub(r'/\* ===== Layout dados do cliente Seven ===== \*/.*?(?=</style>)',layout_css.strip()+'\n',s,flags=re.S)
 
-# Valida que os campos e serviços essenciais continuam presentes.
 required=['id="carpete"','id="imp"','id="total"','id="nome"','id="tel"','id="obs"','id="next1"']
 for item in required:
     if item not in s:
         raise SystemExit('ERRO: faltando '+item)
 
+# Confirma que o Total está fora do grid de serviços.
+check = re.search(r'<div class="service-mobile-grid">(.*?)</div>\s*<div class="total">', s, flags=re.S)
+if not check:
+    raise SystemExit('ERRO: Total ainda não ficou fora da grade de serviços')
+
 p.write_text(s,encoding='utf-8')
-print('Layout atualizado: Nome, WhatsApp e Observação em linhas abaixo do Total')
+print('Corrigido: grid fechado antes do Total; dados do cliente agora ficam abaixo')
