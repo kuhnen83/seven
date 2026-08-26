@@ -21,25 +21,35 @@ jobs:
       - name: Proteger painel administrativo
         run: python .github/scripts/update_agendamento2_auth.py
 
-      - name: Validar protecao administrativa
+      - name: Proteger dados privados no frontend
+        run: python .github/scripts/update_firestore_privacy.py
+
+      - name: Validar seguranca
         run: |
           python - <<'PY'
           from pathlib import Path
-          s=Path('agendamento2.html').read_text(encoding='utf-8')
-          required=['browserSessionPersistence','sevenLoginGate','sevenProtectedPanel','sevenFullPanelSecurity','sevenLogoutBtn','IDLE=30*60*1000','window.sevenSignOut=signOut']
-          for x in required:
-              if x not in s: raise SystemExit('Faltando: '+x)
-          print('Login integral do painel validado')
+          painel=Path('agendamento2.html').read_text(encoding='utf-8')
+          publico=Path('agendar4.html').read_text(encoding='utf-8')
+          rules=Path('firestore.rules').read_text(encoding='utf-8')
+          for x in ['browserSessionPersistence','sevenLoginGate','sevenProtectedPanel','sevenFullPanelSecurity','sevenLogoutBtn','IDLE=30*60*1000','window.sevenSignOut=signOut','window.sincronizarAgendaPublica=']:
+              if x not in painel: raise SystemExit('Painel sem: '+x)
+          for x in ["collection(db,'agenda_publica')","agenda_publica',novoAgendamento.id"]:
+              if x not in publico: raise SystemExit('Página pública sem: '+x)
+          if "collection(db,'agendamentos'),where('service_date'" in publico:
+              raise SystemExit('Página pública ainda tenta ler dados privados')
+          for x in ['allow read, update, delete: if isAdmin();','match /agenda_publica/{id}','allow read: if true;']:
+              if x not in rules: raise SystemExit('Rules sem: '+x)
+          print('Segurança Seven validada')
           PY
 
       - name: Publicar
         run: |
           git config user.name "Seven Agenda Bot"
           git config user.email "actions@users.noreply.github.com"
-          git add agendar4.html agendamento2.html
+          git add agendar4.html agendamento2.html firestore.rules
           if git diff --cached --quiet; then
             echo "Sem alteracoes."
           else
-            git commit -m "Atualiza paginas Seven"
+            git commit -m "Atualiza paginas Seven com protecao de dados"
             git push
           fi
