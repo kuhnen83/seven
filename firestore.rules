@@ -26,27 +26,8 @@ service cloud.firestore {
         && request.resource.data.service_status == 'Agendado';
     }
 
-    // O site público precisa consultar somente se a agenda está aberta
-    // e quais dias foram fechados. Não há dados de clientes aqui.
-    match /config/agenda {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
-    }
-
-    // Dados privados dos clientes.
-    // Visitantes podem apenas criar um novo agendamento válido pelo site.
-    // Somente usuários autenticados podem listar, ler, alterar ou excluir.
-    match /agendamentos/{id} {
-      allow create: if isAdmin() || validPublicBooking();
-      allow read, update, delete: if isAdmin();
-    }
-
-    // Coleção pública sem nome, telefone ou endereço.
-    // É usada pelo agendar4.html somente para verificar horários ocupados.
-    match /agenda_publica/{id} {
-      allow read: if true;
-      allow create: if isAdmin() || (
-        request.resource.data.keys().hasOnly([
+    function validPublicSlot(id) {
+      return request.resource.data.keys().hasOnly([
           'service_date','service_time','duration_minutes','service_status'
         ])
         && request.resource.data.service_date is string
@@ -56,12 +37,31 @@ service cloud.firestore {
         && request.resource.data.duration_minutes <= 1440
         && request.resource.data.service_status == 'Agendado'
         && exists(/databases/$(database)/documents/agendamentos/$(id))
-        && get(/databases/$(database)/documents/agendamentos/$(id)).data.source == 'site_publico'
-      );
-      allow update, delete: if isAdmin();
+        && get(/databases/$(database)/documents/agendamentos/$(id)).data.source == 'site_publico';
     }
 
-    // Qualquer outra coleção fica bloqueada por padrão.
+    match /config/agenda {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /agendamentos/{id} {
+      allow read, update, delete: if isAdmin();
+      allow create: if isAdmin() || validPublicBooking();
+    }
+
+    match /agenda_publica/{id} {
+      allow read: if true;
+
+      // Qualquer usuário autenticado do painel pode criar, atualizar ou excluir
+      // a disponibilidade pública. Esta regra cobre a migração dos horários antigos.
+      allow write: if isAdmin();
+
+      // O site público, sem login, pode APENAS criar um horário correspondente
+      // a um agendamento público recém-criado e sem dados pessoais.
+      allow create: if validPublicSlot(id);
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
