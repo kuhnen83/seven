@@ -31,7 +31,7 @@ jobs:
           painel=Path('agendamento2.html').read_text(encoding='utf-8')
           publico=Path('agendar4.html').read_text(encoding='utf-8')
           rules=Path('firestore.rules').read_text(encoding='utf-8')
-          for x in ['browserSessionPersistence','sevenLoginGate','sevenProtectedPanel','sevenFullPanelSecurity','sevenLogoutBtn','IDLE=30*60*1000','window.sevenSignOut=signOut','window.sincronizarAgendaPublica=','window.migrarAgendaPublica=','btnMigrarAgendaPublica']:
+          for x in ['browserSessionPersistence','sevenLoginGate','sevenProtectedPanel','sevenStandaloneLogin','window.sevenDirectLogin','sevenLogoutBtn','IDLE=30*60*1000','window.sevenSignOut=signOut','window.sincronizarAgendaPublica=','window.migrarAgendaPublica=','btnMigrarAgendaPublica']:
               if x not in painel: raise SystemExit('Painel sem: '+x)
           for x in ["collection(db,'agenda_publica')","agenda_publica',novoAgendamento.id"]:
               if x not in publico: raise SystemExit('Página pública sem: '+x)
@@ -39,7 +39,7 @@ jobs:
               raise SystemExit('Página pública ainda tenta ler dados privados')
           for x in ['allow read, update, delete: if isAdmin();','match /agenda_publica/{id}','allow read: if true;']:
               if x not in rules: raise SystemExit('Rules sem: '+x)
-          print('Segurança e migração Seven validadas')
+          print('Segurança, login e migração Seven validados')
           PY
 
       - name: Publicar
