@@ -25,61 +25,99 @@ p.write_text(s,encoding='utf-8')
 # ===== Painel =====
 p=Path('agendamento2.html')
 s=p.read_text(encoding='utf-8')
-if 'http-equiv="Cache-Control"' not in s:
-    s=s.replace('<meta name="viewport" content="width=device-width,initial-scale=1.0">','<meta name="viewport" content="width=device-width,initial-scale=1.0">\n<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">\n<meta http-equiv="Pragma" content="no-cache">\n<meta http-equiv="Expires" content="0">',1)
 
-# CRÍTICO: o módulo de login já inicializa o Firebase. O módulo principal precisa reutilizar
-# o mesmo app; initializeApp() pela segunda vez fazia o módulo do Firestore parar por completo.
+# Corrige o módulo principal, se existir.
 s=s.replace("import{initializeApp}from'https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js';import{getFirestore,", "import{initializeApp,getApps,getApp}from'https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js';import{getFirestore,")
 s=s.replace("const app=initializeApp(firebaseConfig);const db=getFirestore(app);const auth=getAuth(app);", "const app=getApps().length?getApp():initializeApp(firebaseConfig);const db=getFirestore(app);const auth=getAuth(app);")
-if "const app=getApps().length?getApp():initializeApp(firebaseConfig);" not in s:
-    raise SystemExit('ERRO: módulo principal ainda inicializa Firebase de forma duplicada')
 
-old_panel_import="getFirestore,collection,addDoc,updateDoc,deleteDoc,doc,query,orderBy,onSnapshot,setDoc,getDoc}"
-new_panel_import="getFirestore,collection,addDoc,updateDoc,deleteDoc,doc,query,orderBy,onSnapshot,setDoc,getDoc,getDocs}"
-if old_panel_import in s:s=s.replace(old_panel_import,new_panel_import,1)
-elif 'getDoc,getDocs}' not in s:raise SystemExit('Import Firestore do painel não encontrado')
+# Mantém botão visível e renomeia para V5 para confirmar publicação.
+s=re.sub(r'>🔄 Sincronizar horários v\d+</button>','>🔄 Sincronizar horários v5</button>',s)
+s=s.replace('>🔄 Sincronizar horários</button>','>🔄 Sincronizar horários v5</button>')
 
-old_funcs="window.salvarAgendamentoCloud=async d=>{try{return(await addDoc(collection(db,'agendamentos'),d)).id}catch(e){console.error(e);return null}};window.atualizarAgendamentoCloud=async(id,d)=>{try{await updateDoc(doc(db,'agendamentos',id),d);return true}catch(e){console.error(e);return false}};window.excluirAgendamentoCloud=async id=>{try{await deleteDoc(doc(db,'agendamentos',id));return true}catch(e){console.error(e);return false}};"
-new_funcs="window.sincronizarAgendaPublica=async(id,d)=>{const ref=doc(db,'agenda_publica',id);if(d&&d.service_date&&d.service_time&&d.service_status!=='Cancelado'){await setDoc(ref,{service_date:String(d.service_date),service_time:String(d.service_time),duration_minutes:Number(d.duration_minutes||60),service_status:d.service_status||'Agendado'})}else{try{await deleteDoc(ref)}catch(e){}}};window.salvarAgendamentoCloud=async d=>{try{const r=await addDoc(collection(db,'agendamentos'),d);await window.sincronizarAgendaPublica(r.id,d);return r.id}catch(e){console.error(e);return null}};window.atualizarAgendamentoCloud=async(id,d)=>{try{await updateDoc(doc(db,'agendamentos',id),d);const x=await getDoc(doc(db,'agendamentos',id));if(x.exists())await window.sincronizarAgendaPublica(id,x.data());return true}catch(e){console.error(e);return false}};window.excluirAgendamentoCloud=async id=>{try{await deleteDoc(doc(db,'agendamentos',id));try{await deleteDoc(doc(db,'agenda_publica',id))}catch(e){}return true}catch(e){console.error(e);return false}};"
-if old_funcs in s:s=s.replace(old_funcs,new_funcs,1)
-elif 'window.sincronizarAgendaPublica=' not in s:raise SystemExit('Funções cloud do painel não encontradas')
+# Remove recuperação anterior, se houver.
+s=re.sub(r'<script type="module" id="sevenAgendaRecovery">.*?</script>','',s,flags=re.S)
 
-block="""window.migrarAgendaPublica=async function(){
-if(!auth.currentUser){const e=new Error('Usuário não autenticado no Firebase Authentication');e.code='auth-required';throw e}
-await auth.currentUser.getIdToken(true);
-let snap;try{snap=await getDocs(collection(db,'agendamentos'))}catch(e){const x=new Error('LEITURA de agendamentos falhou: '+(e.message||e.code||e));x.code=e.code||'read-failed';throw x}
-let total=0,ignorados=0;
-for(const d of snap.docs){const a=d.data();if(!a.service_date||!a.service_time||a.service_status==='Cancelado'){ignorados++;continue}try{await setDoc(doc(db,'agenda_publica',d.id),{service_date:String(a.service_date),service_time:String(a.service_time),duration_minutes:Number(a.duration_minutes||60),service_status:a.service_status||'Agendado'});total++}catch(e){const x=new Error('GRAVAÇÃO do documento '+d.id+' falhou: '+(e.message||e.code||e));x.code=e.code||'document-write-failed';throw x}}
-return{total,ignorados}};
+# Módulo independente: não depende do módulo principal da agenda.
+recovery=r'''
+<script type="module" id="sevenAgendaRecovery">
+import { getApps, getApp, initializeApp } from 'https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js';
+import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js';
+import { getFirestore, collection, query, orderBy, onSnapshot, getDocs, doc, setDoc } from 'https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js';
+
+const cfg={apiKey:'AIzaSyAN8PKdOni3mJC-DvAFfjHI1ohBpi7eb28',authDomain:'agendaseven-428ad.firebaseapp.com',projectId:'agendaseven-428ad',storageBucket:'agendaseven-428ad.firebasestorage.app',messagingSenderId:'908846325130',appId:'1:908846325130:web:e5badefe60a02740bc3c73',measurementId:'G-JRKKZWRFCN'};
+const app=getApps().length?getApp():initializeApp(cfg);
+const auth=getAuth(app);
+const db=getFirestore(app);
+let unsub=null;
+
+function status(txt){const st=document.getElementById('statusMigracaoAgendaPublica');if(st)st.textContent=txt}
+function renderClientes(lista){
+  window.agendamentos=lista;
+  try{if(typeof window.gerarProximoNumeroRecibo==='function')window.gerarProximoNumeroRecibo()}catch(e){console.warn(e)}
+  try{if(typeof window.renderCalendario==='function')window.renderCalendario()}catch(e){console.warn(e)}
+  try{const r=document.getElementById('telaResumo');if(r?.classList.contains('active')&&typeof window.renderResumo==='function')window.renderResumo()}catch(e){console.warn(e)}
+}
+function iniciar(){
+  if(unsub){unsub();unsub=null}
+  if(!auth.currentUser){renderClientes([]);status('Aguardando login...');return}
+  status('Carregando clientes...');
+  const q=query(collection(db,'agendamentos'),orderBy('service_date'));
+  unsub=onSnapshot(q,snap=>{
+    const lista=snap.docs.map(x=>({id:x.id,...x.data()}));
+    renderClientes(lista);
+    status('✅ '+lista.length+' clientes carregados');
+  },e=>{
+    console.error('SEVEN RECOVERY - clientes:',e);
+    status('❌ Erro ao carregar clientes: '+(e.code||e.message||e));
+  });
+}
+
 window.executarMigracaoAgendaPublica=async function(){
-const b=document.getElementById('btnMigrarAgendaPublica'),st=document.getElementById('statusMigracaoAgendaPublica');if(!b||!st){alert('Erro interno: botão de sincronização não encontrado.');return}
-if(!auth.currentUser){alert('Sua sessão não está autenticada no Firebase. Saia e entre novamente.');return}
-b.disabled=true;b.textContent='⏳ Sincronizando...';st.style.whiteSpace='pre-wrap';st.textContent='Lendo agendamentos...';
-try{const r=await window.migrarAgendaPublica();const ok='✅ Sincronização concluída: '+r.total+' horários copiados'+(r.ignorados?' • '+r.ignorados+' ignorados.':'.');st.textContent=ok;alert(ok)}catch(e){console.error('ERRO SINCRONIZAÇÃO:',e);const codigo=e?.code||'sem-codigo',mensagem=e?.message||String(e);st.textContent='❌ '+codigo+' — '+mensagem;alert('Falha na sincronização\n\nCódigo: '+codigo+'\n\nDetalhe: '+mensagem)}finally{b.disabled=false;b.textContent='🔄 Sincronizar horários v4'}};
-"""
-s=re.sub(r"window\.migrarAgendaPublica=async function\(\)\{.*?\};(?=window\.salvarConfigAgenda=async)",'',s,count=1,flags=re.S)
-s=re.sub(r"window\.executarMigracaoAgendaPublica=async function\(\)\{.*?\};",'',s,flags=re.S)
-pos=s.find('window.salvarConfigAgenda=async')
-if pos<0:raise SystemExit('Ponto para inserir migração não encontrado')
-s=s[:pos]+block+s[pos:]
+  const b=document.getElementById('btnMigrarAgendaPublica');
+  if(!auth.currentUser){alert('Faça login novamente.');return}
+  if(b){b.disabled=true;b.textContent='⏳ Sincronizando...'}
+  status('Lendo agendamentos...');
+  try{
+    await auth.currentUser.getIdToken(true);
+    const snap=await getDocs(collection(db,'agendamentos'));
+    let total=0,ignorados=0;
+    for(const d of snap.docs){
+      const a=d.data();
+      if(!a.service_date||!a.service_time||a.service_status==='Cancelado'){ignorados++;continue}
+      await setDoc(doc(db,'agenda_publica',d.id),{
+        service_date:String(a.service_date),
+        service_time:String(a.service_time),
+        duration_minutes:Number(a.duration_minutes||60),
+        service_status:a.service_status||'Agendado'
+      });
+      total++;
+    }
+    const m='✅ Sincronização concluída: '+total+' horários copiados'+(ignorados?' • '+ignorados+' ignorados.':'.');
+    status(m);alert(m);
+  }catch(e){
+    console.error('SEVEN RECOVERY - sincronização:',e);
+    const codigo=e?.code||'sem-codigo';const detalhe=e?.message||String(e);
+    status('❌ '+codigo+' — '+detalhe);
+    alert('Falha na sincronização\n\nCódigo: '+codigo+'\n\nDetalhe: '+detalhe);
+  }finally{
+    if(b){b.disabled=false;b.textContent='🔄 Sincronizar horários v5'}
+  }
+};
 
-# Leitura privada somente após autenticação confirmada.
-old_listener=re.compile(r"window\.addEventListener\('DOMContentLoaded',async\(\)=>\{window\.configAgenda=.*?onSnapshot\(q,s=>\{agendamentos=s\.docs\.map\(x=>\(\{id:x\.id,\.\.\.x\.data\(\)\}\)\);gerarProximoNumeroRecibo\(\);renderCalendario\(\);if\(document\.getElementById\('telaResumo'\)\.classList\.contains\('active'\)\)renderResumo\(\)\},e=>console\.error\('Firestore',e\)\)\}\);",re.S)
-listener="""let sevenAgendaUnsub=null;
-function iniciarLeituraPrivada(){if(sevenAgendaUnsub){sevenAgendaUnsub();sevenAgendaUnsub=null}if(!auth.currentUser){agendamentos=[];renderCalendario();return}const q=query(collection(db,'agendamentos'),orderBy('service_date'));sevenAgendaUnsub=onSnapshot(q,snap=>{agendamentos=snap.docs.map(x=>({id:x.id,...x.data()}));gerarProximoNumeroRecibo();renderCalendario();if(document.getElementById('telaResumo').classList.contains('active'))renderResumo();const st=document.getElementById('statusMigracaoAgendaPublica');if(st)st.textContent='✅ '+agendamentos.length+' clientes carregados';},e=>{console.error('Firestore privado',e);const st=document.getElementById('statusMigracaoAgendaPublica');if(st)st.textContent='❌ Erro clientes: '+(e.code||e.message);});}
-window.addEventListener('DOMContentLoaded',async()=>{window.configAgenda=await window.carregarConfigAgenda();window.diasFechados=window.configAgenda.diasFechados||[];window.aplicarStatusAgenda(window.configAgenda.aberta);window.renderDiasFechados();const st=document.getElementById('statusMigracaoAgendaPublica');if(st)st.textContent='Aguardando autenticação...';onAuthStateChanged(auth,user=>{if(user){iniciarLeituraPrivada()}else{if(sevenAgendaUnsub){sevenAgendaUnsub();sevenAgendaUnsub=null}agendamentos=[];renderCalendario()}});});"""
-if old_listener.search(s):s=old_listener.sub(listener,s,count=1)
-elif 'function iniciarLeituraPrivada()' not in s:raise SystemExit('Listener de clientes não encontrado')
+document.addEventListener('DOMContentLoaded',()=>{
+  const b=document.getElementById('btnMigrarAgendaPublica');
+  if(b){b.onclick=null;b.addEventListener('click',window.executarMigracaoAgendaPublica)}
+});
+onAuthStateChanged(auth,user=>{if(user)iniciar();else{if(unsub){unsub();unsub=null}renderClientes([]);status('Aguardando login...')}});
+</script>
+'''
 
-s=s.replace('onclick="executarMigracaoAgendaPublica()"','onclick="window.executarMigracaoAgendaPublica()"')
-s=re.sub(r'>🔄 Sincronizar horários v\d+</button>','>🔄 Sincronizar horários v4</button>',s)
-s=s.replace('>🔄 Sincronizar horários</button>','>🔄 Sincronizar horários v4</button>')
-extra="window.addEventListener('DOMContentLoaded',()=>{const b=document.getElementById('btnMigrarAgendaPublica');if(b){b.onclick=null;b.addEventListener('click',()=>window.executarMigracaoAgendaPublica())}});"
-if extra not in s:
-    pos=s.find('window.salvarConfigAgenda=async');s=s[:pos]+extra+s[pos:]
+pos=s.rfind('</body>')
+if pos<0:raise SystemExit('body não encontrado')
+s=s[:pos]+recovery+'\n'+s[pos:]
 
-for required in ["import{initializeApp,getApps,getApp}","const app=getApps().length?getApp():initializeApp(firebaseConfig);",'function iniciarLeituraPrivada()','Sincronizar horários v4','window.executarMigracaoAgendaPublica=async function']:
-    if required not in s:raise SystemExit('Correção incompleta: '+required)
+for required in ['sevenAgendaRecovery','✅ "+lista.length+" clientes carregados' if False else 'clientes carregados','Sincronizar horários v5','onSnapshot(q,snap=>']:
+    if required not in s:raise SystemExit('Recuperação incompleta: '+required)
+
 p.write_text(s,encoding='utf-8')
-print('Firebase duplicado corrigido; leitura de clientes e sincronização restauradas')
+print('Módulo independente de recuperação da agenda instalado')
