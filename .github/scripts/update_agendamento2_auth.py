@@ -16,7 +16,6 @@ s=s.replace('<button id="sevenLoginBtn" class="seven-login-btn" type="button">En
 s=s.replace('<div id="sevenProtectedPanel" class="seven-protected-panel"><div class="seven-panel-securitybar"><button id="sevenLogoutBtn" class="seven-logout-btn" type="button">Sair</button></div></div>\n<div class="container" id="telaRecibo">',
             '<div id="sevenProtectedPanel" class="seven-protected-panel"><div class="seven-panel-securitybar"><button id="sevenLogoutBtn" class="seven-logout-btn" type="button">Sair</button></div>\n<div class="container" id="telaRecibo">')
 
-# Garante fechamento do wrapper protegido antes do fim do body.
 if '<div id="sevenProtectedPanel"' in s and '</div><!-- sevenProtectedPanel -->' not in s:
     pos=s.rfind('</body>')
     if pos<0: raise SystemExit('body não encontrado')
@@ -46,7 +45,14 @@ function msg(t){const m=el('adminAuthMsg');if(!m)return;m.textContent=t||'';m.cl
 function showLogin(t=''){el('sevenLoginGate')?.classList.remove('hidden');el('sevenProtectedPanel')?.classList.remove('authorized');document.body.classList.add('seven-locked');msg(t)}
 function showPanel(){el('sevenLoginGate')?.classList.add('hidden');el('sevenProtectedPanel')?.classList.add('authorized');document.body.classList.remove('seven-locked');msg('')}
 function activity(force=false){if(!auth.currentUser)return;const n=Date.now();if(!force&&n-lastWrite<5000)return;lastWrite=n;sessionStorage.setItem(KEY,String(n))}
-async function logout(t='Você saiu do painel com segurança.'){try{await signOut(auth)}catch(e){console.error(e)}sessionStorage.removeItem(KEY);showLogin(t)}
+async function logout(t='Você saiu do painel com segurança.'){
+ try{await signOut(auth)}catch(e){console.error('LOGOUT SEVEN:',e)}
+ sessionStorage.removeItem(KEY);
+ try{sessionStorage.removeItem('seven_admin_screen')}catch(e){}
+ showLogin(t);
+}
+window.sevenDirectLogout=logout;
+
 function check(){if(!auth.currentUser)return;const last=Number(sessionStorage.getItem(KEY)||0);if(last&&Date.now()-last>=IDLE)logout('Sua sessão expirou após 30 minutos de inatividade. Entre novamente.');else if(!last)activity(true)}
 
 window.sevenDirectLogin=async function(){
@@ -57,16 +63,21 @@ window.sevenDirectLogin=async function(){
  if(!domainOK(email)){msg('Use um e-mail autorizado do Gmail ou uma conta Apple (iCloud).');return}
  if(!pass){msg('Digite sua senha.');return}
  if(btn){btn.disabled=true;btn.textContent='Entrando...'}
- try{
-   await setPersistence(auth,browserSessionPersistence);
-   await signInWithEmailAndPassword(auth,email,pass);
-   activity(true);
- }catch(e){console.error('LOGIN SEVEN:',e);msg('Não foi possível entrar. Confira o e-mail, a senha e se a conta está cadastrada no Firebase Authentication.')}
+ try{await setPersistence(auth,browserSessionPersistence);await signInWithEmailAndPassword(auth,email,pass);activity(true)}
+ catch(e){console.error('LOGIN SEVEN:',e);msg('Não foi possível entrar. Confira o e-mail, a senha e se a conta está cadastrada no Firebase Authentication.')}
  finally{if(btn){btn.disabled=false;btn.textContent='Entrar'}}
 };
 
+function bindLogoutButtons(){
+ const old=el('sevenLogoutBtn');
+ if(old){old.onclick=null;old.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();window.sevenDirectLogout()})}
+ const side=el('sevenSideLogout');
+ if(side){side.onclick=null;side.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();window.sevenDirectLogout()})}
+}
+
 el('adminPassword')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();window.sevenDirectLogin()}});
-el('sevenLogoutBtn')?.addEventListener('click',()=>logout());
+document.addEventListener('DOMContentLoaded',bindLogoutButtons);
+setTimeout(bindLogoutButtons,300);
 ['pointerdown','keydown','touchstart','scroll'].forEach(ev=>document.addEventListener(ev,()=>activity(false),{passive:true}));
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')check()});
 window.addEventListener('focus',check);
@@ -77,22 +88,19 @@ onAuthStateChanged(auth,user=>{
  if(!domainOK(user.email||'')){logout('Esta conta não está autorizada para o painel.');return}
  const last=Number(sessionStorage.getItem(KEY)||0);
  if(last&&Date.now()-last>=IDLE){logout('Sua sessão expirou. Entre novamente.');return}
- activity(true);showPanel();
+ activity(true);showPanel();bindLogoutButtons();
 });
 </script>
 '''
 
-# Insere o login independente antes dos demais scripts, logo após o wrapper/conteúdo HTML.
 pos=s.find('<script type="module">')
 if pos<0: raise SystemExit('script principal não encontrado')
 s=s[:pos]+standalone+'\n'+s[pos:]
-
-# Remove dependência do antigo registrarAtividadeAdmin nas funções legadas.
 s=s.replace('window.sevenRegistrarAtividadeAdmin();','')
 
-required=['sevenStandaloneLogin','window.sevenDirectLogin','onclick="window.sevenDirectLogin&&window.sevenDirectLogin()"','sevenProtectedPanel -->','browserSessionPersistence']
+required=['sevenStandaloneLogin','window.sevenDirectLogin','window.sevenDirectLogout=logout','sevenSideLogout','browserSessionPersistence']
 for x in required:
-    if x not in s: raise SystemExit('Login incompleto: '+x)
+    if x not in s: raise SystemExit('Login/logout incompleto: '+x)
 
 p.write_text(s,encoding='utf-8')
-print('Login administrativo corrigido com módulo independente e wrapper protegido íntegro')
+print('Login e logout administrativo corrigidos')
