@@ -1,17 +1,69 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Configuração da agenda: qualquer pessoa pode ler o status,
-    // mas somente usuários autenticados podem alterá-la.
-    match /config/agenda {
-      allow read: if true;
-      allow create, update, delete: if request.auth != null;
+
+    function isAdmin() {
+      return request.auth != null;
     }
 
-    // Mantém o comportamento atual da agenda de clientes.
-    // O controle administrativo acima é protegido separadamente.
+    function validPublicBooking() {
+      return request.resource.data.keys().hasAll([
+          'client_name','phone','client_address','service_date','service_time',
+          'total','duration_minutes','source','service_status'
+        ])
+        && request.resource.data.client_name is string
+        && request.resource.data.phone is string
+        && request.resource.data.client_address is string
+        && request.resource.data.service_date is string
+        && request.resource.data.service_time is string
+        && request.resource.data.total is number
+        && request.resource.data.total > 0
+        && request.resource.data.total <= 100000
+        && request.resource.data.duration_minutes is number
+        && request.resource.data.duration_minutes > 0
+        && request.resource.data.duration_minutes <= 1440
+        && request.resource.data.source == 'site_publico'
+        && request.resource.data.service_status == 'Agendado';
+    }
+
+    // O site público precisa consultar somente se a agenda está aberta
+    // e quais dias foram fechados. Não há dados de clientes aqui.
+    match /config/agenda {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Dados privados dos clientes.
+    // Visitantes podem apenas criar um novo agendamento válido pelo site.
+    // Somente usuários autenticados podem listar, ler, alterar ou excluir.
     match /agendamentos/{id} {
-      allow read, create, update, delete: if true;
+      allow create: if isAdmin() || validPublicBooking();
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Coleção pública sem nome, telefone ou endereço.
+    // É usada pelo agendar4.html somente para verificar horários ocupados.
+    match /agenda_publica/{id} {
+      allow read: if true;
+      allow create: if isAdmin() || (
+        request.resource.data.keys().hasOnly([
+          'service_date','service_time','duration_minutes','service_status'
+        ])
+        && request.resource.data.service_date is string
+        && request.resource.data.service_time is string
+        && request.resource.data.duration_minutes is number
+        && request.resource.data.duration_minutes > 0
+        && request.resource.data.duration_minutes <= 1440
+        && request.resource.data.service_status == 'Agendado'
+        && exists(/databases/$(database)/documents/agendamentos/$(id))
+        && get(/databases/$(database)/documents/agendamentos/$(id)).data.source == 'site_publico'
+      );
+      allow update, delete: if isAdmin();
+    }
+
+    // Qualquer outra coleção fica bloqueada por padrão.
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
