@@ -26,23 +26,19 @@ p.write_text(s,encoding='utf-8')
 p=Path('agendamento2.html')
 s=p.read_text(encoding='utf-8')
 
-# Corrige o módulo principal, se existir.
 s=s.replace("import{initializeApp}from'https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js';import{getFirestore,", "import{initializeApp,getApps,getApp}from'https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js';import{getFirestore,")
 s=s.replace("const app=initializeApp(firebaseConfig);const db=getFirestore(app);const auth=getAuth(app);", "const app=getApps().length?getApp():initializeApp(firebaseConfig);const db=getFirestore(app);const auth=getAuth(app);")
 
-# Mantém botão visível e renomeia para V5 para confirmar publicação.
 s=re.sub(r'>🔄 Sincronizar horários v\d+</button>','>🔄 Sincronizar horários v5</button>',s)
 s=s.replace('>🔄 Sincronizar horários</button>','>🔄 Sincronizar horários v5</button>')
 
-# Remove recuperação anterior, se houver.
 s=re.sub(r'<script type="module" id="sevenAgendaRecovery">.*?</script>','',s,flags=re.S)
 
-# Módulo independente: não depende do módulo principal da agenda.
 recovery=r'''
 <script type="module" id="sevenAgendaRecovery">
 import { getApps, getApp, initializeApp } from 'https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js';
 import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js';
-import { getFirestore, collection, query, orderBy, onSnapshot, getDocs, doc, setDoc } from 'https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js';
+import { getFirestore, collection, query, orderBy, onSnapshot, getDocs, doc, setDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js';
 
 const cfg={apiKey:'AIzaSyAN8PKdOni3mJC-DvAFfjHI1ohBpi7eb28',authDomain:'agendaseven-428ad.firebaseapp.com',projectId:'agendaseven-428ad',storageBucket:'agendaseven-428ad.firebasestorage.app',messagingSenderId:'908846325130',appId:'1:908846325130:web:e5badefe60a02740bc3c73',measurementId:'G-JRKKZWRFCN'};
 const app=getApps().length?getApp():initializeApp(cfg);
@@ -72,6 +68,40 @@ function iniciar(){
   });
 }
 
+// Exclusão robusta: apaga o registro privado e também libera o horário público.
+window.excluirAgendamentoCloud=async function(id){
+  if(!id) return false;
+  if(!auth.currentUser){alert('Sua sessão expirou. Entre novamente.');return false}
+  try{
+    await auth.currentUser.getIdToken(true);
+    await deleteDoc(doc(db,'agendamentos',String(id)));
+    try{await deleteDoc(doc(db,'agenda_publica',String(id)))}catch(e){console.warn('Horário público não pôde ser removido:',e)}
+    return true;
+  }catch(e){
+    console.error('ERRO AO EXCLUIR AGENDAMENTO:',e);
+    alert('Não foi possível excluir o agendamento.\n\nCódigo: '+(e?.code||'sem-codigo')+'\nDetalhe: '+(e?.message||String(e)));
+    return false;
+  }
+};
+
+window.excluirAgendamento=async function(){
+  const campo=document.getElementById('idEditando');
+  const id=campo?.value||window.detalheId||'';
+  if(!id){alert('Nenhum agendamento selecionado para excluir.');return}
+  if(!confirm('Deseja realmente excluir este agendamento?'))return;
+  const btn=document.getElementById('btnExcluir');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Excluindo...'}
+  const ok=await window.excluirAgendamentoCloud(id);
+  if(ok){
+    try{window.agendamentos=(window.agendamentos||[]).filter(a=>String(a.id)!==String(id))}catch(e){}
+    try{if(typeof window.fecharDetalhes==='function')window.fecharDetalhes()}catch(e){}
+    try{if(typeof window.limparFormulario==='function')window.limparFormulario()}catch(e){}
+    try{if(typeof window.renderCalendario==='function')window.renderCalendario()}catch(e){}
+    alert('Agendamento excluído com sucesso.');
+  }
+  if(btn){btn.disabled=false;btn.textContent='🗑️ Excluir'}
+};
+
 window.executarMigracaoAgendaPublica=async function(){
   const b=document.getElementById('btnMigrarAgendaPublica');
   if(!auth.currentUser){alert('Faça login novamente.');return}
@@ -85,10 +115,7 @@ window.executarMigracaoAgendaPublica=async function(){
       const a=d.data();
       if(!a.service_date||!a.service_time||a.service_status==='Cancelado'){ignorados++;continue}
       await setDoc(doc(db,'agenda_publica',d.id),{
-        service_date:String(a.service_date),
-        service_time:String(a.service_time),
-        duration_minutes:Number(a.duration_minutes||60),
-        service_status:a.service_status||'Agendado'
+        service_date:String(a.service_date),service_time:String(a.service_time),duration_minutes:Number(a.duration_minutes||60),service_status:a.service_status||'Agendado'
       });
       total++;
     }
@@ -107,6 +134,8 @@ window.executarMigracaoAgendaPublica=async function(){
 document.addEventListener('DOMContentLoaded',()=>{
   const b=document.getElementById('btnMigrarAgendaPublica');
   if(b){b.onclick=null;b.addEventListener('click',window.executarMigracaoAgendaPublica)}
+  const del=document.getElementById('btnExcluir');
+  if(del){del.onclick=null;del.addEventListener('click',e=>{e.preventDefault();window.excluirAgendamento()})}
 });
 onAuthStateChanged(auth,user=>{if(user)iniciar();else{if(unsub){unsub();unsub=null}renderClientes([]);status('Aguardando login...')}});
 </script>
@@ -116,8 +145,8 @@ pos=s.rfind('</body>')
 if pos<0:raise SystemExit('body não encontrado')
 s=s[:pos]+recovery+'\n'+s[pos:]
 
-for required in ['sevenAgendaRecovery','✅ "+lista.length+" clientes carregados' if False else 'clientes carregados','Sincronizar horários v5','onSnapshot(q,snap=>']:
+for required in ['sevenAgendaRecovery','clientes carregados','Sincronizar horários v5','onSnapshot(q,snap=>','window.excluirAgendamentoCloud=async function','Agendamento excluído com sucesso']:
     if required not in s:raise SystemExit('Recuperação incompleta: '+required)
 
 p.write_text(s,encoding='utf-8')
-print('Módulo independente de recuperação da agenda instalado')
+print('Módulo independente da agenda instalado; exclusão corrigida')
