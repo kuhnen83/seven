@@ -33,6 +33,15 @@ body{margin:0;font-family:Arial,sans-serif;background:#eef4f9;color:#202124}.wra
 #s1 #next1{display:block!important;width:100%!important;clear:both!important;margin-top:16px!important}
 @media(min-width:701px){#s1 .total ~ .field{width:100%!important}}
 @media(max-width:700px){#s1 .total ~ .field{width:100%!important;margin:12px 0!important}}
+
+/* ===== Etapas em telas individuais ===== */
+.step{display:none!important}
+.step.active{display:block!important;animation:sevenStepIn .18s ease-out}
+@keyframes sevenStepIn{from{opacity:.25;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media(max-width:700px){
+  .content{padding-top:18px!important}
+  .step.active{min-height:calc(100svh - 120px)}
+}
 </style>
 </head>
 <body>
@@ -91,6 +100,7 @@ body{margin:0;font-family:Arial,sans-serif;background:#eef4f9;color:#202124}.wra
 </div>
 </div>
 </div>
+</div>
 <div class="total"><strong>Total</strong><strong id="total">R$ 0,00</strong></div>
 <div class="field"><label>Nome completo *</label><input id="nome" placeholder="Seu nome"></div><div class="field"><label>WhatsApp *</label><input id="tel" placeholder="(48) 99999-9999"></div><div class="field"><label>Observação</label><textarea id="obs" rows="3" placeholder="Detalhes do atendimento"></textarea></div>
 <button class="primary" id="next1">Continuar →</button></section>
@@ -126,4 +136,37 @@ $('cont').onclick=()=>{if(chosen&&window.diasFechados.includes(chosen.date)){err
 $('send').onclick=async()=>{clearError();const cfg=await getDoc(doc(db,'config','agenda'));const cd=cfg.exists()?cfg.data():{};const bloqueados=Array.isArray(cd.diasFechados)?cd.diasFechados:[];if(cd.aberta===false){error('A agenda está temporariamente fechada.');return}if(chosen&&bloqueados.includes(chosen.date)){error('Esta data não está mais disponível. Escolha outro dia.');show(3);return}const i=info();if(i.total<129){error('O valor mínimo para realizar um agendamento é R$ 129,00.');return}if(!chosen){error('Escolha um horário.');return}$('send').disabled=true;try{const s=await getDocs(query(collection(db,'agenda_publica'),where('service_date','==',chosen.date)));if(s.docs.some(x=>{const a=x.data();return a.service_status!=='Cancelado'&&a.service_time&&clash(mins(chosen.time),i.dur,a)})){error('Esse horário acabou de ser ocupado. Escolha outro.');$('send').disabled=false;show(3);return}const end=$('rua').value+', '+$('num').value+' - '+$('bairro').value+' - '+$('cidade').value+' - CEP '+$('cep').value;const novoAgendamento=await addDoc(collection(db,'agendamentos'),{receipt_number:'WEB-'+Date.now().toString().slice(-6),client_name:$('nome').value.trim(),phone:$('tel').value.trim(),client_address:end,cep:$('cep').value,street:$('rua').value,number:$('num').value,neighborhood:$('bairro').value,city:$('cidade').value,reference:$('ref').value,service_date:chosen.date,service_time:chosen.time,description:i.items.map(x=>(x.quantity>1?x.quantity+'x ':'')+x.name).join(' + ')+($('obs').value?' — '+$('obs').value:''),services:i.items,quantity:i.items.reduce((s,x)=>s+x.quantity,0),unit_price:i.items.length===1?i.items[0].unit_price:i.total,total:i.total,duration_minutes:i.dur,payment_method:'A definir',payment_status:'Pendente',service_status:'Agendado',source:'site_publico',created_at:new Date().toISOString()});await setDoc(doc(db,'agenda_publica',novoAgendamento.id),{service_date:chosen.date,service_time:chosen.time,duration_minutes:i.dur,service_status:'Agendado'});const d=new Date(chosen.date+'T12:00:00');$('oktxt').textContent='Seu atendimento foi reservado para '+d.toLocaleDateString('pt-BR')+' às '+chosen.time+'. Valor total: R$ '+i.total.toLocaleString('pt-BR',{minimumFractionDigits:2})+'.';document.querySelectorAll('.step').forEach(x=>x.classList.remove('active'));$('ok').classList.add('active')}catch(e){console.error(e);error('Não foi possível concluir o agendamento. Tente novamente.')}finally{$('send').disabled=false}};
 </script>
 <a class="whatsapp-float" href="https://wa.me/5548996782471?text=Ol%C3%A1%2C%20vim%20pelo%20agendamento%20online%20da%20Seven%20e%20preciso%20de%20ajuda." target="_blank" rel="noopener" aria-label="Falar com a Seven pelo WhatsApp" title="Falar com a Seven pelo WhatsApp"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M19.11 17.36c-.28-.14-1.66-.82-1.92-.91-.26-.1-.45-.14-.64.14-.19.28-.73.91-.9 1.1-.17.19-.33.21-.61.07-.28-.14-1.18-.43-2.25-1.39-.83-.74-1.39-1.65-1.55-1.93-.16-.28-.02-.43.12-.57.13-.13.28-.33.42-.49.14-.16.19-.28.28-.47.09-.19.05-.35-.02-.49-.07-.14-.64-1.54-.88-2.11-.23-.56-.47-.48-.64-.49h-.55c-.19 0-.49.07-.75.35-.26.28-.99.97-.99 2.36s1.02 2.74 1.16 2.93c.14.19 2 3.05 4.85 4.28.68.29 1.21.47 1.62.6.68.22 1.3.19 1.79.12.55-.08 1.66-.68 1.9-1.34.23-.66.23-1.23.16-1.34-.07-.12-.26-.19-.54-.33zM16.03 4.8A11.1 11.1 0 0 0 6.6 21.76L5.03 27.5l5.87-1.54a11.1 11.1 0 1 0 5.13-21.16zm0 20.18c-1.72 0-3.4-.46-4.86-1.33l-.35-.21-3.48.91.93-3.39-.23-.35a9.07 9.07 0 1 1 7.99 4.37z"/></svg></a>
+
+<script id="sevenStepScreenController">
+(function(){
+  let changing=false;
+  function topOfContent(){
+    const spacer=document.querySelector('.seven-menu-spacer');
+    const y=spacer?spacer.getBoundingClientRect().bottom+window.scrollY:0;
+    window.scrollTo({top:Math.max(0,y-4),behavior:'smooth'});
+  }
+  function activateOnly(target){
+    if(changing||!target||!target.classList.contains('step'))return;
+    changing=true;
+    document.querySelectorAll('.step.active').forEach(el=>{if(el!==target)el.classList.remove('active')});
+    changing=false;
+    setTimeout(topOfContent,20);
+  }
+  function start(){
+    const steps=[...document.querySelectorAll('.step')];
+    const observer=new MutationObserver(list=>{
+      for(const m of list){
+        if(m.type==='attributes'&&m.attributeName==='class'&&m.target.classList.contains('active')){
+          activateOnly(m.target);
+        }
+      }
+    });
+    steps.forEach(el=>observer.observe(el,{attributes:true,attributeFilter:['class']}));
+    const initial=steps.find(el=>el.classList.contains('active'));
+    if(initial)activateOnly(initial);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+})();
+</script>
+
 </body></html>
