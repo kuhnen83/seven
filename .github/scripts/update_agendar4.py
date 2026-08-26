@@ -31,7 +31,7 @@ if 'id="carro"' not in s:
         raise SystemExit('ERRO: bloco Cadeiras/Total não encontrado')
     s = s.replace(old, new, 1)
 
-# ===== 3. Cálculo =====
+# ===== 3. Cálculo dos serviços já existentes =====
 if "$('carro').checked" not in s:
     old = "if($('cad').checked){const q=qty('qcad',1,50);a.push({name:'Cadeira',price:24*q,dur:60*q,quantity:q,unit_price:24})}return a}"
     new = "if($('cad').checked){const q=qty('qcad',1,50);a.push({name:'Cadeira',price:24*q,dur:60*q,quantity:q,unit_price:24})}if($('carro').checked){const x=document.querySelector('input[name=carv]:checked');if(!x)return null;a.push({name:x.dataset.name,price:+x.value,dur:+x.dataset.dur,quantity:1,unit_price:+x.value})}if($('carpete').checked){const q=Math.max(1,Math.min(100,parseFloat($('qcarpete').value)||1));$('qcarpete').value=q;a.push({name:'Carpete '+q.toLocaleString('pt-BR')+' m²',price:49*q,dur:Math.max(30,Math.ceil(q*30)),quantity:q,unit_price:49})}if($('cab').checked){const x=document.querySelector('input[name=cabv]:checked');if(!x)return null;a.push({name:x.dataset.name,price:+x.value,dur:+x.dataset.dur,quantity:1,unit_price:+x.value})}return a}"
@@ -55,7 +55,7 @@ if "$('carro').onchange=" not in s:
         raise SystemExit('ERRO: eventos atuais não encontrados')
     s = s.replace(marker, events + marker, 1)
 
-# ===== 6. Validação =====
+# ===== 6. Validação existente =====
 oldv = "if(($('sofa').checked&&!document.querySelector('input[name=sv]:checked'))||($('col').checked&&!document.querySelector('input[name=cv]:checked'))){error('Selecione o tamanho do sofá ou colchão.');return}"
 newv = "if(($('sofa').checked&&!document.querySelector('input[name=sv]:checked'))||($('col').checked&&!document.querySelector('input[name=cv]:checked'))||($('carro').checked&&!document.querySelector('input[name=carv]:checked'))||($('cab').checked&&!document.querySelector('input[name=cabv]:checked'))){error('Selecione a opção do serviço escolhido.');return}"
 if oldv in s:
@@ -79,10 +79,51 @@ if len(matches) >= 2:
         last = max(matches[0].end(), matches[1].end())
         s = s[:first] + cards['cab'] + '\n' + cards['carpete'] + s[last:]
 
-# ===== 9. CSS compacto definitivo =====
+# ===== 9. Impermeabilização: card, cálculo, evento e validação =====
+if 'id="imp"' not in s:
+    carpete_marker = '<div class="service service-card"><label><input type="checkbox" id="carpete">'
+    if carpete_marker not in s:
+        raise SystemExit('ERRO: card Carpete não encontrado para inserir Impermeabilização')
+    imp_card = '''<div class="service service-card"><label><input type="checkbox" id="imp"><span class="service-icon">🛡️</span><span class="service-name">Impermeabilização</span><span class="service-count">4 opções</span></label><div id="impv" class="variants">
+<label class="variant"><span><input type="radio" name="impv" value="298" data-name="Impermeabilização sofá até 1,80 m" data-dur="120"> Sofá até 1,80 m</span><b>R$ 298,00</b></label>
+<label class="variant"><span><input type="radio" name="impv" value="338" data-name="Impermeabilização sofá até 2,30 m" data-dur="120"> Sofá até 2,30 m</span><b>R$ 338,00</b></label>
+<label class="variant"><span><input type="radio" name="impv" value="378" data-name="Impermeabilização sofá até 2,65 m" data-dur="120"> Sofá até 2,65 m</span><b>R$ 378,00</b></label>
+<label class="variant"><span><input type="radio" name="impv" value="418" data-name="Impermeabilização sofá até 3,00 m" data-dur="120"> Sofá até 3,00 m</span><b>R$ 418,00</b></label>
+</div></div>
+'''
+    s = s.replace(carpete_marker, imp_card + carpete_marker, 1)
+
+if "$('imp').checked" not in s:
+    m = re.search(r'(function items\(\)\{.*?)(return a\})', s, flags=re.S)
+    if not m:
+        raise SystemExit('ERRO: função items() não encontrada para Impermeabilização')
+    imp_calc = "if($('imp').checked){const x=document.querySelector('input[name=impv]:checked');if(!x)return null;a.push({name:x.dataset.name,price:+x.value,dur:+x.dataset.dur,quantity:1,unit_price:+x.value})}"
+    s = s[:m.start(2)] + imp_calc + s[m.start(2):]
+
+if "$('impv').style.display='none'" not in s:
+    init_marker = "$('cabv').style.display='none';"
+    if init_marker not in s:
+        raise SystemExit('ERRO: inicialização da Cabeceira não encontrada')
+    s = s.replace(init_marker, init_marker + "$('impv').style.display='none';", 1)
+
+if "$('imp').onchange=" not in s:
+    event_marker = "$('sofa').onchange=()=>{"
+    if event_marker not in s:
+        raise SystemExit('ERRO: ponto de eventos não encontrado')
+    imp_event = "$('imp').onchange=()=>{$('impv').style.display=$('imp').checked?'block':'none';if(!$('imp').checked)document.querySelectorAll('input[name=impv]').forEach(x=>x.checked=false);calc()};"
+    s = s.replace(event_marker, imp_event + event_marker, 1)
+
+if "$('imp').checked&&!document.querySelector('input[name=impv]:checked')" not in s:
+    validation_marker = "($('cab').checked&&!document.querySelector('input[name=cabv]:checked'))"
+    if validation_marker in s:
+        s = s.replace(validation_marker, validation_marker + "||($('imp').checked&&!document.querySelector('input[name=impv]:checked'))", 1)
+
+# ===== 10. CSS compacto definitivo + Carpete horizontal =====
 compact_css = '''
 /* ===== Cards compactos Seven ===== */
 .service-intro{margin:0 0 13px}.service-intro-main{margin:0 0 8px;font-size:15px;line-height:1.4;color:#202124}.service-benefits{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;font-weight:800;color:#0f4c81}.benefit-separator{color:#9aa8b8}.service-mobile-grid{gap:8px!important;margin:12px 0 14px!important}.service-mobile-grid .service-card{border-radius:12px!important;box-shadow:0 4px 12px #0b17300b!important}.service-mobile-grid .service-card>label{min-height:96px!important;padding:9px 10px!important}.service-icon{width:34px!important;height:34px!important;border-radius:9px!important;font-size:19px!important;margin-bottom:6px!important}.service-name{font-size:15px!important;line-height:1!important}.service-count{font-size:10.5px!important;padding-top:5px!important}.service-card:has(input:checked)>label{padding:9px 10px!important;grid-template-columns:42px 1fr!important}.service-card:has(input:checked) .service-icon{width:34px!important;height:34px!important}.service-card:has(input:checked) .service-name{font-size:15px!important}.service-card:has(input:checked) .service-count{font-size:10.5px!important}.service-mobile-grid .variants,.service-mobile-grid .qty{margin:0 8px 8px!important}.service-mobile-grid .variant{padding:7px!important;margin:5px 0!important}@media(min-width:701px){.service-mobile-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:10px!important}.service-mobile-grid .service-card>label{min-height:102px!important}}@media(max-width:700px){.service-intro-main{font-size:14px}.service-benefits{font-size:12px;gap:7px}.service-mobile-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important}.service-mobile-grid .service-card>label{min-height:92px!important;padding:8px 9px!important}.service-icon{width:32px!important;height:32px!important;font-size:18px!important;margin-bottom:5px!important}.service-name{font-size:14px!important}.service-count{font-size:10px!important;padding-top:4px!important}}@media(max-width:380px){.service-benefits{gap:5px;font-size:11px}.service-mobile-grid{gap:7px!important}.service-mobile-grid .service-card>label{min-height:88px!important;padding:7px 8px!important}.service-icon{width:30px!important;height:30px!important;font-size:17px!important}.service-name{font-size:13.5px!important}.service-count{font-size:9.5px!important}}
+/* ===== Carpete horizontal largura dupla ===== */
+.service-mobile-grid .service-card:has(#carpete){grid-column:span 2!important}.service-mobile-grid .service-card:has(#carpete)>label{min-height:78px!important;display:grid!important;grid-template-columns:42px 1fr!important;grid-template-rows:auto auto!important;column-gap:10px!important;align-items:center!important;padding:10px 12px!important}.service-mobile-grid .service-card:has(#carpete) .service-icon{grid-row:1/3!important;margin:0!important;width:36px!important;height:36px!important;font-size:20px!important}.service-mobile-grid .service-card:has(#carpete) .service-name{font-size:15px!important;align-self:end!important}.service-mobile-grid .service-card:has(#carpete) .service-count{font-size:11px!important;padding:2px 0 0!important;margin:0!important;align-self:start!important}@media(max-width:700px){.service-mobile-grid .service-card:has(#carpete){grid-column:1/-1!important}.service-mobile-grid .service-card:has(#carpete)>label{min-height:72px!important;grid-template-columns:38px 1fr!important;padding:9px 10px!important}.service-mobile-grid .service-card:has(#carpete) .service-icon{width:32px!important;height:32px!important;font-size:18px!important}.service-mobile-grid .service-card:has(#carpete) .service-name{font-size:14px!important}.service-mobile-grid .service-card:has(#carpete) .service-count{font-size:10px!important}}
 '''
 marker = '/* ===== Cards compactos Seven ===== */'
 if marker not in s:
@@ -90,11 +131,11 @@ if marker not in s:
 else:
     s = re.sub(r'/\* ===== Cards compactos Seven ===== \*/.*?(?=</style>)', compact_css.strip()+'\n', s, flags=re.S)
 
-# ===== 10. Validação final =====
-required = ['id="carro"','id="carpete"','id="cab"','Hatch - bancos e carpete','Sedan - bancos e carpete','SUV - bancos e carpete','Caminhonete - bancos e carpete','Cabeceira solteiro','Cabeceira casal','Cabeceira Queen','Cabeceira King','⚠️ Informação importante','até 8 horas',"$('carro').onchange=", "$('carpete').onchange=", "$('cab').onchange=",'Escolha o item abaixo, veja o preço e agende em 2 minutos.','Pague só no dia','Seguro para pets e crianças','Cards compactos Seven']
+# ===== 11. Validação final =====
+required = ['id="carro"','id="carpete"','id="cab"','id="imp"','Hatch - bancos e carpete','Sedan - bancos e carpete','SUV - bancos e carpete','Caminhonete - bancos e carpete','Cabeceira solteiro','Cabeceira casal','Cabeceira Queen','Cabeceira King','R$ 298,00','R$ 338,00','R$ 378,00','R$ 418,00','⚠️ Informação importante','até 8 horas',"$('carro').onchange=", "$('carpete').onchange=", "$('cab').onchange=", "$('imp').onchange=", "$('imp').checked",'Escolha o item abaixo, veja o preço e agende em 2 minutos.','Pague só no dia','Seguro para pets e crianças','Cards compactos Seven','Carpete horizontal largura dupla']
 for item in required:
     if item not in s:
         raise SystemExit('ERRO: faltando '+item)
 
 p.write_text(s, encoding='utf-8')
-print('agendar4.html atualizado com sucesso')
+print('agendar4.html atualizado com sucesso, incluindo Impermeabilização')
