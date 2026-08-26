@@ -18,7 +18,7 @@ jobs:
       - name: Atualizar pagina publica
         run: python .github/scripts/update_agendar4.py
 
-      - name: Proteger sessao administrativa
+      - name: Proteger painel administrativo
         run: python .github/scripts/update_agendamento2_auth.py
 
       - name: Validar protecao administrativa
@@ -26,10 +26,10 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           s=Path('agendamento2.html').read_text(encoding='utf-8')
-          required=['browserSessionPersistence','sevenAdminSessionSecurity','TEMPO_INATIVIDADE=30*60*1000','seven_admin_last_activity','window.sevenSignOut=signOut']
+          required=['browserSessionPersistence','sevenLoginGate','sevenProtectedPanel','sevenFullPanelSecurity','sevenLogoutBtn','IDLE=30*60*1000','window.sevenSignOut=signOut']
           for x in required:
               if x not in s: raise SystemExit('Faltando: '+x)
-          print('Protecao administrativa validada')
+          print('Login integral do painel validado')
           PY
 
       - name: Publicar
