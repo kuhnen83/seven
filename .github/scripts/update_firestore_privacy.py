@@ -15,8 +15,6 @@ elif 'addDoc,setDoc,doc,getDoc' not in s:
 s=s.replace("query(collection(db,'agendamentos'),where('service_date','==',data))","query(collection(db,'agenda_publica'),where('service_date','==',data))")
 s=s.replace("query(collection(db,'agendamentos'),where('service_date','==',chosen.date))","query(collection(db,'agenda_publica'),where('service_date','==',chosen.date))")
 
-# Esta etapa precisa ser idempotente: se o agendar4 já grava agenda_publica,
-# não tenta transformar novamente o mesmo addDoc.
 already_public = "agenda_publica',novoAgendamento.id" in s
 if not already_public:
     old="await addDoc(collection(db,'agendamentos'),{receipt_number:'WEB-'+Date.now().toString().slice(-6),client_name:"
@@ -40,7 +38,6 @@ p.write_text(s,encoding='utf-8')
 p=Path('agendamento2.html')
 s=p.read_text(encoding='utf-8')
 
-# Adiciona getDocs uma única vez.
 old_panel_import="getFirestore,collection,addDoc,updateDoc,deleteDoc,doc,query,orderBy,onSnapshot,setDoc,getDoc}"
 new_panel_import="getFirestore,collection,addDoc,updateDoc,deleteDoc,doc,query,orderBy,onSnapshot,setDoc,getDoc,getDocs}"
 if old_panel_import in s:
@@ -55,8 +52,11 @@ if old_funcs in s:
 elif 'window.sincronizarAgendaPublica=' not in s:
     raise SystemExit('Funções cloud do painel não encontradas')
 
-migration="""window.migrarAgendaPublica=async function(){if(!window.sevenAuth?.currentUser)throw new Error('AUTH_REQUIRED');const snap=await getDocs(collection(db,'agendamentos'));let total=0,ignorados=0;for(const d of snap.docs){const a=d.data();if(!a.service_date||!a.service_time||a.service_status==='Cancelado'){ignorados++;continue}await setDoc(doc(db,'agenda_publica',d.id),{service_date:a.service_date,service_time:a.service_time,duration_minutes:Number(a.duration_minutes||60),service_status:a.service_status||'Agendado'});total++}return{total,ignorados}};"""
-if 'window.migrarAgendaPublica=' not in s:
+# Substitui sempre a função de migração para garantir diagnóstico detalhado.
+migration="""window.migrarAgendaPublica=async function(){if(!window.sevenAuth?.currentUser){const e=new Error('Usuário não autenticado');e.code='auth-required';throw e}let snap;try{snap=await getDocs(collection(db,'agendamentos'))}catch(e){e.message='Falha ao LER agendamentos: '+(e.message||e.code||'erro desconhecido');throw e}let total=0,ignorados=0;for(const d of snap.docs){const a=d.data();if(!a.service_date||!a.service_time||a.service_status==='Cancelado'){ignorados++;continue}try{await setDoc(doc(db,'agenda_publica',d.id),{service_date:String(a.service_date),service_time:String(a.service_time),duration_minutes:Number(a.duration_minutes||60),service_status:a.service_status||'Agendado'});total++}catch(e){e.message='Falha ao GRAVAR agenda_publica no documento '+d.id+': '+(e.message||e.code||'erro desconhecido');throw e}}return{total,ignorados}};"""
+if 'window.migrarAgendaPublica=' in s:
+    s=re.sub(r"window\.migrarAgendaPublica=async function\(\)\{.*?\};(?=window\.salvarConfigAgenda=async)",migration,s,count=1,flags=re.S)
+else:
     pos=s.find('window.salvarConfigAgenda=async')
     if pos<0:
         raise SystemExit('Ponto de migração não encontrado')
@@ -69,16 +69,18 @@ if 'id="btnMigrarAgendaPublica"' not in s:
         raise SystemExit('Botão Fechar agenda não encontrado')
     s=s.replace(target,target+button,1)
 
-helper="""window.executarMigracaoAgendaPublica=async function(){const b=document.getElementById('btnMigrarAgendaPublica'),st=document.getElementById('statusMigracaoAgendaPublica');if(!window.sevenAuth?.currentUser){alert('Faça login novamente.');return}b.disabled=true;st.textContent='Sincronizando...';try{const r=await window.migrarAgendaPublica();st.textContent='✅ '+r.total+' horários sincronizados';alert('Sincronização concluída: '+r.total+' horários copiados'+(r.ignorados?' • '+r.ignorados+' ignorados sem horário ou cancelados.':'.'));}catch(e){console.error(e);st.textContent='❌ Falha';alert('Não foi possível sincronizar.');}finally{b.disabled=false}};"""
-if 'window.executarMigracaoAgendaPublica=' not in s:
+helper="""window.executarMigracaoAgendaPublica=async function(){const b=document.getElementById('btnMigrarAgendaPublica'),st=document.getElementById('statusMigracaoAgendaPublica');if(!window.sevenAuth?.currentUser){alert('Faça login novamente.');return}b.disabled=true;st.textContent='Sincronizando...';try{await window.sevenAuth.currentUser.getIdToken(true);const r=await window.migrarAgendaPublica();st.textContent='✅ '+r.total+' horários sincronizados';alert('Sincronização concluída: '+r.total+' horários copiados'+(r.ignorados?' • '+r.ignorados+' ignorados sem horário ou cancelados.':'.'));}catch(e){console.error('ERRO SINCRONIZAÇÃO:',e);const codigo=e?.code||'sem-codigo';const mensagem=e?.message||String(e);st.textContent='❌ '+codigo;alert('Erro na sincronização\n\nCódigo: '+codigo+'\n\nDetalhe: '+mensagem+'\n\nCopie ou tire uma foto desta mensagem para fazermos a correção exata.');}finally{b.disabled=false}};"""
+if 'window.executarMigracaoAgendaPublica=' in s:
+    s=re.sub(r"window\.executarMigracaoAgendaPublica=async function\(\)\{.*?\};(?=</script>)",helper,s,count=1,flags=re.S)
+else:
     pos=s.rfind('</script>')
     if pos<0:
         raise SystemExit('Script final do painel não encontrado')
     s=s[:pos]+helper+s[pos:]
 
-for required in ['window.migrarAgendaPublica=','btnMigrarAgendaPublica',"doc(db,'agenda_publica',id)",'getDoc,getDocs}']:
+for required in ['window.migrarAgendaPublica=','btnMigrarAgendaPublica','ERRO SINCRONIZAÇÃO:','Código: ','getIdToken(true)']:
     if required not in s:
-        raise SystemExit('Migração incompleta: '+required)
+        raise SystemExit('Diagnóstico incompleto: '+required)
 
 p.write_text(s,encoding='utf-8')
-print('Migração e sincronização da agenda pública preparadas com fluxo idempotente')
+print('Diagnóstico detalhado da sincronização aplicado')
