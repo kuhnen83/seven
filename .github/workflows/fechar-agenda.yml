@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Atualizar pagina publica
         run: python .github/scripts/update_agendar4.py
@@ -47,8 +49,6 @@ jobs:
         run: python .github/scripts/update_logout_final.py
       - name: Corrigir exclusao e controles da agenda
         run: python .github/scripts/update_agenda_actions_fix.py
-      - name: Aplicar bloqueio visual e periodos
-        run: python .github/scripts/update_bloqueio_periodos_v2.py
 
       - name: Validar seguranca e painel
         run: |
@@ -57,14 +57,16 @@ jobs:
           painel=Path('agendamento2.html').read_text(encoding='utf-8')
           publico=Path('agendar4.html').read_text(encoding='utf-8')
           rules=Path('firestore.rules').read_text(encoding='utf-8')
-          for x in ['browserSessionPersistence','sevenLoginGate','sevenProtectedPanel','sevenStandaloneLogin','window.sevenDirectLogin','window.sevenDirectLogout=logout','sevenLogoutBtn','sevenSideLogout','sevenLogoutFinalFix','window.sevenLogoutFinal','IDLE=30*60*1000','window.sevenSignOut=signOut','window.sincronizarAgendaPublica=','window.migrarAgendaPublica=','btnMigrarAgendaPublica','sevenAdminSidebar','sevenLeadsScreen','sevenWalletScreen','sevenLeadsHalfSize','sevenLeadsScrollDetailFix','sevenWalletLikeLeads','sevenAgendaActionsFix','btnExcluirDetalhe','sevenExcluirAgendamentoFinal','sevenAlternarAgendaFinal','sevenFecharDiaFinal','sevenBlockedCalendarStyle','sevenMonthBlockingController','sevenFecharMesAtual','sevenReabrirMesAtual']:
+          for x in ['browserSessionPersistence','sevenLoginGate','sevenProtectedPanel','sevenStandaloneLogin','window.sevenDirectLogin','window.sevenDirectLogout=logout','sevenLogoutBtn','sevenSideLogout','sevenLogoutFinalFix','window.sevenLogoutFinal','IDLE=30*60*1000','window.sevenSignOut=signOut','window.sincronizarAgendaPublica=','window.migrarAgendaPublica=','btnMigrarAgendaPublica','sevenAdminSidebar','sevenLeadsScreen','sevenWalletScreen','sevenLeadsHalfSize','sevenLeadsScrollDetailFix','sevenWalletLikeLeads','sevenAgendaActionsFix','btnExcluirDetalhe','sevenExcluirAgendamentoFinal','sevenAlternarAgendaFinal','sevenFecharDiaFinal']:
               if x not in painel: raise SystemExit('Painel sem: '+x)
-          for x in ["collection(db,'agenda_publica')","agenda_publica',novoAgendamento.id",'sevenPeriodAvailabilityStyle','periodoOcupado','PERIODOS=[','service_period:chosen.period']:
-              if x not in publico: raise SystemExit('Página pública ainda incompleta: '+x)
+          for x in ["collection(db,'agenda_publica')","agenda_publica',novoAgendamento.id",'className=\'slots\'','className=\'slot\'']:
+              if x not in publico: raise SystemExit('Página pública sem escolha de horários: '+x)
+          if 'sevenPeriodAvailabilityStyle' in publico or 'PERIODOS=[' in publico:
+              raise SystemExit('Página pública ainda contém seleção por períodos')
           if "collection(db,'agendamentos'),where('service_date'" in publico: raise SystemExit('Página pública ainda tenta ler dados privados')
           for x in ['allow read, update, delete: if isAdmin();','match /agenda_publica/{id}','allow read: if true;']:
               if x not in rules: raise SystemExit('Rules sem: '+x)
-          print('Segurança, agenda e períodos Seven validados')
+          print('Segurança e escolha de dia/horário validadas')
           PY
 
       - name: Publicar
@@ -75,6 +77,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "Sem alteracoes."
           else
-            git commit -m "Atualiza bloqueio visual e periodos da agenda"
+            git commit -m "Mantem agendamento por dia e horario"
             git push
           fi
