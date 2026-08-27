@@ -1,5 +1,10 @@
 name: Aplicar bloqueio e periodos v2
 on:
+  push:
+    branches: [implementacao-bloqueio-periodos-v2]
+    paths:
+      - '.github/workflows/apply-bloqueio-periodos-v2.yml'
+      - '.github/scripts/update_bloqueio_periodos_v2.py'
   workflow_dispatch:
 permissions:
   contents: write
@@ -21,6 +26,10 @@ jobs:
           grep -q 'sevenMonthBlockingController' agendamento2.html
           grep -q 'sevenPeriodAvailabilityStyle' agendar4.html
           grep -q 'periodoOcupado' agendar4.html
+          grep -q 'sevenLogoutFinalFix' agendamento2.html
+          grep -q 'sevenLeadsHalfSize' agendamento2.html
+          grep -q 'sevenWalletLikeLeads' agendamento2.html
+          grep -q 'sevenAgendaActionsFix' agendamento2.html
       - name: Commit da implementacao
         run: |
           git config user.name 'github-actions[bot]'
