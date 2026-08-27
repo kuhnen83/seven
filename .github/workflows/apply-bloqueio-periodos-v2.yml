@@ -1,0 +1,31 @@
+name: Aplicar bloqueio e periodos v2
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  aplicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: implementacao-bloqueio-periodos-v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Aplicar alteracoes
+        run: python .github/scripts/update_bloqueio_periodos_v2.py
+      - name: Validar arquivos
+        run: |
+          grep -q 'sevenBlockedCalendarStyle' agendamento2.html
+          grep -q 'sevenMonthBlockingController' agendamento2.html
+          grep -q 'sevenPeriodAvailabilityStyle' agendar4.html
+          grep -q 'periodoOcupado' agendar4.html
+      - name: Commit da implementacao
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add agendamento2.html agendar4.html
+          git diff --cached --quiet && exit 0
+          git commit -m 'Implementa bloqueio visual e disponibilidade por periodos'
+          git push origin HEAD:implementacao-bloqueio-periodos-v2
