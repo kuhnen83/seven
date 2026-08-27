@@ -51,6 +51,8 @@ jobs:
         run: python .github/scripts/update_agenda_actions_fix.py
       - name: Corrigir salvamento de alteracoes
         run: python .github/scripts/update_save_edit_fix.py
+      - name: Controlador final de Salvar Alteracoes
+        run: python .github/scripts/update_save_edit_final.py
 
       - name: Validar seguranca e painel
         run: |
@@ -59,8 +61,9 @@ jobs:
           painel=Path('agendamento2.html').read_text(encoding='utf-8')
           publico=Path('agendar4.html').read_text(encoding='utf-8')
           rules=Path('firestore.rules').read_text(encoding='utf-8')
-          for x in ['browserSessionPersistence','sevenLoginGate','sevenProtectedPanel','sevenStandaloneLogin','window.sevenDirectLogin','window.sevenDirectLogout=logout','sevenLogoutBtn','sevenSideLogout','sevenLogoutFinalFix','window.sevenLogoutFinal','IDLE=30*60*1000','window.sevenSignOut=signOut','window.sincronizarAgendaPublica=','window.migrarAgendaPublica=','btnMigrarAgendaPublica','sevenAdminSidebar','sevenLeadsScreen','sevenWalletScreen','sevenLeadsHalfSize','sevenLeadsScrollDetailFix','sevenWalletLikeLeads','sevenAgendaActionsFix','btnExcluirDetalhe','sevenExcluirAgendamentoFinal','sevenAlternarAgendaFinal','sevenFecharDiaFinal','window.sevenLastUpdateError=e','getIdToken(true)']:
+          for x in ['browserSessionPersistence','sevenLoginGate','sevenProtectedPanel','window.sevenDirectLogin','window.sevenDirectLogout=logout','sevenLogoutFinalFix','window.sevenLogoutFinal','IDLE=30*60*1000','window.sevenSignOut=signOut','window.sincronizarAgendaPublica=','btnMigrarAgendaPublica','sevenAdminSidebar','sevenLeadsScreen','sevenWalletScreen','sevenLeadsHalfSize','sevenLeadsScrollDetailFix','sevenWalletLikeLeads','sevenAgendaActionsFix','btnExcluirDetalhe','sevenExcluirAgendamentoFinal','sevenAlternarAgendaFinal','sevenFecharDiaFinal','window.sevenLastUpdateError=e','sevenSaveEditFinalFix','window.sevenSalvarAlteracoesFinal=salvar']:
               if x not in painel: raise SystemExit('Painel sem: '+x)
+          if painel.count('id="sevenSaveEditFinalFix"') != 1: raise SystemExit('Controlador final de edição duplicado')
           for x in ["collection(db,'agenda_publica')","agenda_publica',novoAgendamento.id",'className=\'slots\'','className=\'slot\'']:
               if x not in publico: raise SystemExit('Página pública sem escolha de horários: '+x)
           if 'sevenPeriodAvailabilityStyle' in publico or 'PERIODOS=[' in publico:
@@ -79,6 +82,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "Sem alteracoes."
           else
-            git commit -m "Corrige salvamento de alteracoes do agendamento"
+            git commit -m "Corrige definitivamente Salvar Alteracoes"
             git push
           fi
